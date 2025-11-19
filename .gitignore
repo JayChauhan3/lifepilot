@@ -68,3 +68,8 @@ backend/.pytest_cache/
 # ------------------------------
 build/
 dist/
+
+
+# Ignore ChromaDB data
+backend/data/*
+!backend/data/.gitkeep
