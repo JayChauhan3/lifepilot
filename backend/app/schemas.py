@@ -21,7 +21,9 @@ class AgentMessage(BaseModel):
 
 class PlanPayload(BaseModel):
     user_message: str
-    steps: List[str]
+    steps: List[Any]
+    title: Optional[str] = "Plan"
+    description: Optional[str] = ""
     priority: str
     estimated_duration: str
     context_used: Optional[bool] = False

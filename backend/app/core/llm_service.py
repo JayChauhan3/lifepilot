@@ -44,7 +44,7 @@ class GeminiLLM(LLMProvider):
             logger.error("Failed to initialize Gemini", error=str(e))
             self._model = None
     
-    def generate_text(self, prompt: str, max_tokens: int = 1000, temperature: float = 0.7) -> str:
+    def generate_text(self, prompt: str, max_tokens: int = 4000, temperature: float = 0.7) -> str:
         """Generate text using Gemini"""
         logger.info("GeminiLLM generate_text called", model_set=self._model is not None)
         if not self._model:
@@ -74,51 +74,68 @@ class GeminiLLM(LLMProvider):
         if "plan" in prompt.lower():
             return """Based on your request, here's a structured plan:
 
-## Action Steps
-1. Analyze current requirements and constraints
-2. Break down the task into manageable subtasks
-3. Prioritize tasks based on importance and dependencies
-4. Set realistic timelines for each task
-5. Execute tasks in order of priority
+## 📋 Action Plan
 
-## Timeline
-- Week 1: Analysis and planning
-- Week 2-3: Core implementation
-- Week 4: Testing and refinement
+| Step | Action | Details |
+|------|--------|---------|
+| 1 | **Analyze** | Analyze current requirements and constraints |
+| 2 | **Breakdown** | Break down the task into manageable subtasks |
+| 3 | **Prioritize** | Prioritize tasks based on importance |
+| 4 | **Timeline** | Set realistic timelines for each task |
+| 5 | **Execute** | Execute tasks in order of priority |
 
-## Resources Needed
+### 🗓️ Timeline
+- **Week 1**: Analysis and planning
+- **Week 2-3**: Core implementation
+- **Week 4**: Testing and refinement
+
+### 🛠️ Resources Needed
 - Time allocation: 2-3 hours per week
 - Tools and materials as specified
 - Regular progress reviews
 
-This plan provides a clear roadmap for achieving your goals efficiently."""
+💡 **Suggestion**: Would you like me to create a detailed daily schedule for Week 1?"""
         
         elif "search" in prompt.lower() or "find" in prompt.lower():
-            return """Search Results Summary:
+            return """## 🔍 Search Results Summary
 
 Based on the available information, I found several relevant resources:
 
-1. Primary sources indicate the core requirements for your task
-2. Secondary sources provide additional context and best practices
-3. Recent updates show current trends and recommendations
+### 🔑 Key Findings
 
-Key findings:
-- The most effective approach combines structured planning with flexibility
-- Consider both short-term needs and long-term goals
+| Source Type | Finding | Relevance |
+|-------------|---------|-----------|
+| Primary | Core requirements identified | High |
+| Secondary | Best practices and context | Medium |
+| Updates | Recent trends and news | Low |
+
+### 📝 Details
+- The most effective approach combines **structured planning** with flexibility
+- Consider both *short-term needs* and *long-term goals*
 - Regular review and adjustment is recommended
 
-Would you like me to elaborate on any specific aspect?"""
+💡 **Suggestion**: I can dive deeper into the "Primary" sources if you're interested."""
         
         else:
             return """I understand your request. Based on the context and information available, here's my response:
 
-The key points to consider are:
-- Understanding your specific needs and requirements
-- Evaluating available options and alternatives
-- Making informed decisions based on evidence
-- Implementing solutions in a structured manner
+## 💡 Key Points
 
-I recommend proceeding with a systematic approach to achieve the best results. Let me know if you need more specific guidance or have additional questions."""
+- **Understanding**: Your specific needs and requirements
+- **Evaluating**: Available options and alternatives
+- **Decisions**: Making informed decisions based on evidence
+- **Implementation**: Solutions in a structured manner
+
+### 📊 Comparison
+
+| Option | Pros | Cons |
+|--------|------|------|
+| Option A | Fast, Cheap | Low Quality |
+| Option B | High Quality | Expensive |
+
+I recommend proceeding with a systematic approach to achieve the best results.
+
+💡 **Suggestion**: Shall we start with Option A?"""
 
 class MockLLMProvider(LLMProvider):
     """Mock LLM provider for testing"""
@@ -177,21 +194,20 @@ class LLMService:
         
         full_prompt += "\n\nGenerate the plan JSON now:"
         
-        response = self.generate_text(full_prompt, max_tokens=1500)
+        response = self.generate_text(full_prompt, max_tokens=4000)
         logger.info("Raw Gemini response for plan", response=response[:500])
         
-        # Strip markdown code blocks if present
-        if response.startswith("```json"):
-            response = response[7:]  # Remove ```json
-        if response.startswith("```"):
-            response = response[3:]   # Remove ```
-        if response.endswith("```"):
-            response = response[:-3]   # Remove trailing ```
-        response = response.strip()
-        
+        # Extract JSON using regex
+        import re
+        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(0)
+        else:
+            json_str = response
+
         try:
             # Try to parse JSON response
-            plan = json.loads(response)
+            plan = json.loads(json_str)
             return plan
         except Exception as e:
             # Fallback to structured format
@@ -201,12 +217,12 @@ class LLMService:
                 "title": "Action Plan",
                 "description": "Plan based on user request",
                 "steps": [
-                    {"step": 1, "action": "Analyze requirements", "details": response[:200]},
-                    {"step": 2, "action": "Create detailed plan", "details": "Break down into subtasks"},
-                    {"step": 3, "action": "Execute plan", "details": "Implement step by step"}
+                    {"step": 1, "action": "Analyze requirements", "details": "Analyze the user's request in detail."},
+                    {"step": 2, "action": "Create detailed plan", "details": "Break down the task into actionable steps."},
+                    {"step": 3, "action": "Execute plan", "details": "Follow the steps to achieve the goal."}
                 ],
-                "timeline": "1-2 weeks",
-                "resources": ["Time", "Resources as needed"]
+                "timeline": "As needed",
+                "resources": ["Time", "Effort"]
             }
     
     def generate_knowledge_response(self, query: str, context: str = "") -> str:

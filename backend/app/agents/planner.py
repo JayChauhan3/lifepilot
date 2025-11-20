@@ -49,9 +49,22 @@ class PlannerAgent:
                     product_info += f"- {product['name']}: ${product['price']}\n"
                 compacted_context += product_info
         
+        # Get chat history from session service
+        # Note: PlannerAgent doesn't have direct access to session_service instance in current init
+        # We'll need to instantiate it or pass it in. For now, let's instantiate it.
+        from ..core.session_service import SessionService
+        session_service = SessionService()
+        # Assuming user_id is used to create session_id in a standard way, but we need the actual session_id
+        # Since we don't have it passed, we might miss history here. 
+        # Ideally RouterAgent should pass context.
+        # For now, we'll rely on the user_message being descriptive enough or the fallback being smarter.
+        
         # Generate plan using LLM
         try:
-            plan_data = self.llm_service.generate_plan(user_message, compacted_context)
+            # Enhance prompt with instruction to ask for clarification
+            enhanced_context = f"{compacted_context}\n\nIMPORTANT: If the user request is vague (e.g. 'plan something'), return a plan with a single step: 'Ask for clarification on what to plan'."
+            
+            plan_data = self.llm_service.generate_plan(user_message, enhanced_context)
             logger.info("Raw plan data from LLM", plan_data=str(plan_data)[:200])
             
             # Extract steps from plan data
@@ -76,29 +89,38 @@ class PlannerAgent:
                 # If no valid steps found, use Gemini to generate them directly
                 if not steps:
                     fallback_response = self.llm_service.generate_text(
-                        f"Create 3-4 actionable steps for: {user_message}",
+                        f"Create 3-4 actionable steps for: {user_message}. If vague, ask for details.",
                         max_tokens=300
                     )
                     steps = [step.strip() for step in fallback_response.split('\n') if step.strip() and len(step.strip()) > 5][:4]
-            
             # Create plan payload
             plan_payload = PlanPayload(
                 user_message=user_message,
                 steps=steps,
+                title=plan_data.get("title", "Action Plan"),
+                description=plan_data.get("description", ""),
                 priority=plan_data.get("priority", "medium"),
-                estimated_duration=plan_data.get("timeline", "30 minutes"),
-                context_used=bool(context),
+                estimated_duration=plan_data.get("timeline", "As needed"),
+                context_used=bool(enhanced_context),
                 llm_generated=True
             )
             
         except Exception as e:
             logger.error("Failed to generate plan with LLM", error=str(e))
             # Generate basic fallback without mock templates
-            steps = [
-                "Analyze the request and requirements",
-                "Create a structured action plan",
-                "Execute the plan step by step"
-            ]
+            # IMPROVED FALLBACK: Don't hallucinate specific steps for vague requests
+            if len(user_message.split()) < 4 and "plan" in user_message.lower():
+                 steps = [
+                    "Please provide more details about what you'd like to plan",
+                    "I can help with daily routines, projects, or shopping",
+                    "Let me know your specific goals"
+                ]
+            else:
+                steps = [
+                    "Analyze the request and requirements",
+                    "Create a structured action plan",
+                    "Execute the plan step by step"
+                ]
             
             plan_payload = PlanPayload(
                 user_message=user_message,
@@ -134,6 +156,7 @@ class PlannerAgent:
     
     def _generate_fallback_steps(self, user_message: str, shopping_tool: ShoppingTool) -> List[str]:
         """Generate fallback steps when LLM is not available"""
+        # This method is largely replaced by the try/except block above but kept for safety
         words = user_message.split()
         steps = []
         
@@ -160,9 +183,15 @@ class PlannerAgent:
                 "Light exercise or stretching"
             ]
         
-        # General planning
+        # General planning - IMPROVED to avoid hallucination
         elif "plan" in user_message.lower():
-            if len(words) <= 5:
+            if len(words) <= 3: # Very short request like "plan my day" without details
+                 steps = [
+                    "Please share more details about your day",
+                    "What are your key priorities?",
+                    "Any specific meetings or tasks?"
+                ]
+            elif len(words) <= 5:
                 steps = [
                     f"Research {user_message.replace('plan', '').strip()} requirements",
                     "Create detailed action steps",

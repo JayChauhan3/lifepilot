@@ -317,5 +317,17 @@ class MemoryBank:
         # Sort by relevance
         contexts.sort(key=lambda x: x["score"], reverse=True)
         
-        logger.info("Context retrieved", user_id=user_id, query=query, contexts_count=len(contexts))
-        return contexts[:k]
+# Global MemoryBank instance
+_memory_bank = None
+
+def get_memory_bank() -> MemoryBank:
+    """Get global MemoryBank instance"""
+    global _memory_bank
+    if _memory_bank is None:
+        _memory_bank = MemoryBank()
+    return _memory_bank
+
+def reset_memory_bank():
+    """Reset MemoryBank instance (for testing)"""
+    global _memory_bank
+    _memory_bank = None

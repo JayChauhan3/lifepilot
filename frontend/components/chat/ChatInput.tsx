@@ -3,14 +3,14 @@ import { useChatStore } from '@/store/chatStore'
 import { Button } from '@/components/ui/Button'
 
 export const ChatInput: React.FC = () => {
-  const { inputValue, setInputValue, sendMessageStreaming, isLoading, isStreaming, stopStreaming } = useChatStore()
+  const { inputValue, setInputValue, sendMessage, isLoading, isStreaming, stopStreaming } = useChatStore()
   const [isFocused, setIsFocused] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleSend = () => {
     if (inputValue.trim() && !isLoading && !isStreaming) {
-      sendMessageStreaming()
+      sendMessage()
     }
   }
 
@@ -52,7 +52,7 @@ export const ChatInput: React.FC = () => {
       {isFocused && (
         <div className="absolute inset-0 bg-white/10 rounded-2xl blur-xl"></div>
       )}
-      
+
       <div className="relative bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-1 transition-all duration-300 hover:bg-white/15">
         <div className="flex flex-col gap-0">
           {/* Message Input */}
@@ -69,7 +69,7 @@ export const ChatInput: React.FC = () => {
             rows={1}
             style={{ maxHeight: '200px' }}
           />
-          
+
           {/* Send Button */}
           <div className="flex justify-between items-center px-2 pb-2">
             <div className="text-xs text-gray-400">
@@ -86,17 +86,16 @@ export const ChatInput: React.FC = () => {
                 </span>
               )}
             </div>
-            
+
             <button
               onClick={isStreaming ? handleStop : handleSend}
               disabled={(!inputValue.trim() && !isStreaming) || (isLoading && !isStreaming)}
-              className={`p-2 rounded-xl transition-all duration-200 flex items-center justify-center ${
-                isStreaming 
+              className={`p-2 rounded-xl transition-all duration-200 flex items-center justify-center ${isStreaming
                   ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
                   : inputValue.trim() && !isLoading && !isStreaming
                     ? 'bg-black text-white hover:bg-gray-800 shadow-lg hover:shadow-xl transform hover:scale-105 border border-white/20'
                     : 'bg-white/10 text-gray-400 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed border border-white/20'
-              }`}
+                }`}
             >
               {isStreaming ? (
                 <>

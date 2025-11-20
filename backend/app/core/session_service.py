@@ -23,12 +23,30 @@ class SessionService:
             "created_at": datetime.now(),
             "last_activity": datetime.now(),
             "message_count": 0,
-            "context": {}
+            "context": {},
+            "history": []
         }
         
         self.sessions[session_id] = session_data
         logger.info("Session created", session_id=session_id, user_id=user_id)
+        self.sessions[session_id] = session_data
+        logger.info("Session created", session_id=session_id, user_id=user_id)
         return session_id
+    
+    def get_active_session(self, user_id: str) -> str:
+        """Get active session for user or create new one"""
+        # Check for existing active session
+        for session_id, session in self.sessions.items():
+            if session["user_id"] == user_id:
+                # Check if expired
+                if datetime.now() - session["last_activity"] <= self.session_timeout:
+                    # Update activity time
+                    session["last_activity"] = datetime.now()
+                    logger.info("Active session found", session_id=session_id, user_id=user_id)
+                    return session_id
+        
+        # No active session found, create new one
+        return self.create_session(user_id)
     
     def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get session by ID"""
@@ -63,6 +81,31 @@ class SessionService:
             session["message_count"] += 1
             return True
         return False
+
+    def add_message(self, session_id: str, role: str, content: str) -> bool:
+        """Add a message to the session history"""
+        session = self.get_session(session_id)
+        if session:
+            message = {
+                "role": role,
+                "content": content,
+                "timestamp": datetime.now().isoformat()
+            }
+            if "history" not in session:
+                session["history"] = []
+            session["history"].append(message)
+            # Keep history limited to last 50 messages to prevent bloating
+            if len(session["history"]) > 50:
+                session["history"] = session["history"][-50:]
+            return True
+        return False
+
+    def get_chat_history(self, session_id: str, limit: int = 10) -> list:
+        """Get recent chat history"""
+        session = self.get_session(session_id)
+        if session and "history" in session:
+            return session["history"][-limit:]
+        return []
     
     def cleanup_expired_sessions(self) -> int:
         """Remove expired sessions and return count of removed sessions"""

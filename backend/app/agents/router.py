@@ -3,7 +3,7 @@ import re
 import time
 from ..core.a2a import A2AProtocol
 from ..core.session_service import SessionService
-from ..core.memory_bank import MemoryBank
+from ..core.memory_bank import MemoryBank, get_memory_bank
 from ..core.llm_service import get_llm_service
 from ..tools.calendar_tool import CalendarTool
 from ..tools.web_search_tool import WebSearchTool
@@ -29,7 +29,7 @@ class RouterAgent:
         # Core services
         self.session_service = SessionService()
         self.llm_service = get_llm_service()
-        self.memory_bank = MemoryBank()
+        self.memory_bank = get_memory_bank()
         
         # Tools
         self.calendar_tool = CalendarTool()
@@ -46,7 +46,7 @@ class RouterAgent:
             r'remember\s*:\s*',
             r'i\s+have\s+a\s+(meeting|appointment|deadline|task)',
             r'my\s+(preference|habit|routine)',
-            r'i\s+(prefer|like|enjoy|want|need)',
+            # r'i\s+(prefer|like|enjoy|want|need)', # Too aggressive, causes false positives
             r'store\s+this',
             r'keep\s+in\s+mind'
         ]
@@ -64,23 +64,22 @@ class RouterAgent:
         
         # Knowledge query patterns
         knowledge_patterns = [
-            r'what\s+(are|is)',
-            r'how\s+(do|does|to)',
-            r'why\s+(is|are|do)',
-            r'explain\s+',
-            r'describe\s+',
-            r'(search|find|look\s+up)',
-            r'information\s+about',
-            r'best\s+practices',
-            r'(latest|recent)',
-            r'trends\s+in'
+            r'search\s+for',
+            r'find\s+info\s+on',
+            r'look\s+up',
+            r'what\s+is\s+the\s+(capital|population|meaning|definition)',
+            r'who\s+is\s+(the\s+)?(ceo|president|founder)',
+            r'latest\s+news\s+about',
+            r'current\s+trends\s+in',
+            r'best\s+practices\s+for'
         ]
         
         # Planning patterns
         planning_patterns = [
-            r'plan\s+(my|for\s+me)',
+            r'plan\s+(my|for\s+me|for\s+my)',
+            r'give\s+me\s+.*plan',
             r'help\s+me\s+plan',
-            r'create\s+a\s+plan',
+            r'create\s+.*plan',
             r'(schedule|organize)',
             r'project\s+plan',
             r'daily\s+plan',
@@ -146,26 +145,34 @@ class RouterAgent:
         ]
         
         # Check patterns in priority order
+        
+        # 1. Planning (Highest priority - specific intent)
+        for pattern in planning_patterns:
+            if re.search(pattern, message_lower):
+                return "planning_request"
+
+        # 2. Knowledge Search (Specific intent)
+        for pattern in knowledge_patterns:
+            if re.search(pattern, message_lower):
+                return "knowledge_search"
+
+        # 3. Memory Retrieval (Specific intent)
+        for pattern in retrieval_patterns:
+            if re.search(pattern, message_lower):
+                return "memory_retrieve"
+
+        # 4. Memory Storage (Lower priority - can be ambiguous with "my routine")
+        # Removed aggressive pattern r'i\s+(prefer|like|enjoy|want|need)' to avoid false positives like "I want a table"
         for pattern in memory_patterns:
             if re.search(pattern, message_lower):
                 return "memory_store"
                 
-        for pattern in retrieval_patterns:
-            if re.search(pattern, message_lower):
-                return "memory_retrieve"
-                
-        for pattern in knowledge_patterns:
-            if re.search(pattern, message_lower):
-                return "knowledge_search"
-                
-        for pattern in planning_patterns:
-            if re.search(pattern, message_lower):
-                return "planning_request"
-                
+        # 5. Context Continuation
         for pattern in context_patterns:
             if re.search(pattern, message_lower):
                 return "context_continuation"
                 
+        # 6. Error Handling
         for pattern in error_patterns:
             if re.search(pattern, message_lower):
                 return "error_handling"
@@ -181,12 +188,13 @@ class RouterAgent:
         logger.info("Processing message", user_id=user_id, message=message)
         
         # Create or get session
-        session_id = self.session_service.create_session(user_id)
+        session_id = self.session_service.get_active_session(user_id)
         session = self.session_service.get_session(session_id)
         
-        # Store the user message in memory bank
+        # Store the user message in memory bank and session history
         self.memory_bank.store_memory(user_id, "last_message", message, "chat")
         self.session_service.increment_message_count(session_id)
+        self.session_service.add_message(session_id, "user", message)
         
         # Detect message type and route accordingly
         message_type = self._detect_message_type(message)
@@ -240,7 +248,10 @@ class RouterAgent:
                     formatted_results = []
                     for item in knowledge_data:
                         if isinstance(item, dict):
-                            formatted_results.append(f"- {item.get('title', 'Untitled')}: {item.get('snippet', 'No description')}")
+                            title = item.get('title', 'Untitled')
+                            snippet = item.get('snippet', 'No description')
+                            url = item.get('url', '#')
+                            formatted_results.append(f"### 🔍 {title}\n_{snippet}_\n[Source]({url})")
                         else:
                             formatted_results.append(str(item))
                     
@@ -259,7 +270,42 @@ class RouterAgent:
                 plan_steps = plan_response.payload.get("steps", [])
                 
                 if plan_steps:
-                    final_response = f"Here's your plan:\n\n{chr(10).join(f'{i+1}. {step}' for i, step in enumerate(plan_steps))}"
+                    # Format the plan nicely with Markdown
+                    plan_title = plan_response.payload.get("title", "Here's your plan")
+                    plan_desc = plan_response.payload.get("description", "")
+                    
+                    formatted_response = f"## {plan_title}\n\n"
+                    if plan_desc:
+                        formatted_response += f"_{plan_desc}_\n\n"
+                    
+                    for i, step in enumerate(plan_steps, 1):
+                        if isinstance(step, dict):
+                            action = step.get("action", "")
+                            details = step.get("details", "")
+                            formatted_response += f"**{i}. {action}**\n"
+                            if details:
+                                formatted_response += f"   - {details}\n"
+                        else:
+                            formatted_response += f"{i}. {step}\n"
+                    
+                    formatted_response += f"\n**Timeline:** {plan_response.payload.get('estimated_duration', 'N/A')}\n\n"
+                    
+                    # Add Summary Table
+                    formatted_response += "### 📋 Summary Table\n\n"
+                    formatted_response += "| Step | Action | Details |\n"
+                    formatted_response += "| :--- | :--- | :--- |\n"
+                    
+                    for i, step in enumerate(plan_steps, 1):
+                        if isinstance(step, dict):
+                            action = step.get("action", "Action")
+                            details = step.get("details", "-")
+                            # Truncate details for table if too long
+                            short_details = (details[:50] + '...') if len(details) > 50 else details
+                            formatted_response += f"| {i} | {action} | {short_details} |\n"
+                        else:
+                            formatted_response += f"| {i} | {step} | - |\n"
+                    
+                    final_response = formatted_response
                     logger.info("Planning completed", user_id=user_id, steps_count=len(plan_steps))
                 else:
                     final_response = "I couldn't create a plan for that request."
@@ -290,11 +336,48 @@ class RouterAgent:
                 agent_used = "conversation_agent"
                 tools_used = ["llm_service"]
                 # Default: Use real Gemini for general conversation (NO MORE MOCK PIPELINE)
-                final_response = self.llm_service.generate_text(message)
+                
+                # Get chat history
+                history = self.session_service.get_chat_history(session_id, limit=5)
+                history_str = ""
+                for msg in history:
+                    role = "User" if msg["role"] == "user" else "LifePilot"
+                    history_str += f"{role}: {msg['content']}\n"
+                
+                system_instruction = """
+You are LifePilot, a helpful and structured AI assistant.
+
+VERSATILITY & ADAPTABILITY:
+- You are a versatile assistant capable of helping with ANY topic (coding, cooking, travel, lifestyle, etc.).
+- You can switch topics seamlessly. Do not restrict yourself to the previous topic or domain.
+- If the user changes the subject, adapt immediately.
+
+CONTEXT AWARENESS:
+- You have access to the recent conversation history.
+- Use this context to answer follow-up questions (e.g., "tell me more about that").
+- If the user refers to something previously discussed, use that information.
+
+RESPONSE FORMATTING:
+ALWAYS use Markdown formatting to make your responses clear and visually appealing.
+- Use **Headings** (##, ###) to organize sections.
+- Use **Tables** to present structured data, comparisons, or lists.
+- Use **Bold** for key terms.
+- Use **Emojis** to add visual interest to headings and key points.
+- Use **Lists** (bulleted or numbered) for steps or items.
+- At the end of your response, provide a **💡 Suggestion** for what the user might want to do next.
+
+CLARIFICATION OVER HALLUCINATION:
+- If the user's request is vague (e.g., "plan something"), DO NOT make up a random plan.
+- Instead, ask clarifying questions to understand their needs (e.g., "What would you like me to plan?").
+- Only provide a detailed plan when you have sufficient information.
+"""
+                full_prompt = f"{system_instruction}\n\nConversation History:\n{history_str}\nUser Message: {message}"
+                final_response = self.llm_service.generate_text(full_prompt)
                 logger.info("General conversation completed", user_id=user_id)
             
-            # Store final response in session context
+            # Store final response in session context and history
             self.session_service.update_session_context(session_id, "last_response", final_response)
+            self.session_service.add_message(session_id, "assistant", final_response)
             
             # Calculate processing time
             processing_time = time.time() - start_time
@@ -322,3 +405,18 @@ class RouterAgent:
                 "processing_time": time.time() - start_time,
                 "message_type": "error"
             }
+
+# Global RouterAgent instance
+_router_agent = None
+
+def get_router_agent() -> RouterAgent:
+    """Get global RouterAgent instance"""
+    global _router_agent
+    if _router_agent is None:
+        _router_agent = RouterAgent()
+    return _router_agent
+
+def reset_router_agent():
+    """Reset RouterAgent instance (for testing)"""
+    global _router_agent
+    _router_agent = None

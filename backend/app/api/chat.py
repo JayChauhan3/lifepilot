@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException
 import structlog
 from app.schemas import ChatRequest, ChatResponse, AgentMessage
-from app.agents.router import RouterAgent
+from app.agents.router import RouterAgent, get_router_agent
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -13,7 +13,7 @@ async def chat(request: ChatRequest):
     
     try:
         # Initialize router agent
-        router_agent = RouterAgent()
+        router_agent = get_router_agent()
         
         # Process the message through the agent pipeline
         response_data = await router_agent.process_message(request.user_id, request.message)
