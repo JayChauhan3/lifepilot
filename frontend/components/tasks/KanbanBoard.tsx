@@ -246,15 +246,15 @@ function TaskCard({ task, index, isDone, onClick, onDelete, onCheckboxClick }: T
             </div>
 
             <div className="flex items-center justify-between mt-3 pl-7">
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mb-1 max-w-[calc(100%-60px)]">
                     {task.tags.map(tag => (
-                        <span key={tag} className="px-2 py-1 bg-gray-50 text-gray-600 text-[10px] font-medium uppercase tracking-wide rounded-md border border-gray-100">
+                        <span key={tag} className="px-2 py-1 bg-gray-50 text-gray-600 text-[10px] font-medium uppercase tracking-wide rounded-md border border-gray-100 shrink-0 whitespace-nowrap">
                             {tag}
                         </span>
                     ))}
                 </div>
 
-                <div className="flex items-center gap-1 text-xs text-gray-400 shrink-0">
+                <div className="flex items-center gap-1 text-xs text-gray-400 shrink-0 ml-2">
                     <FiCalendar size={12} />
                     <span>{task.time}</span>
                 </div>
