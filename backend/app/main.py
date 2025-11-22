@@ -1,5 +1,5 @@
 # FastAPI startup
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from contextlib import asynccontextmanager
@@ -9,6 +9,7 @@ load_dotenv()
 import structlog
 from app.api.chat import router as chat_router
 from app.core.orchestrator import orchestrator
+from app.core.websocket_manager import notification_manager
 
 logger = structlog.get_logger()
 
@@ -17,11 +18,13 @@ async def lifespan(app: FastAPI):
     """Application lifespan management"""
     # Startup
     logger.info("Starting LifePilot API application")
+    await orchestrator.start()
     
     yield
     
     # Shutdown
     logger.info("Shutting down LifePilot API application")
+    await orchestrator.stop()
 
 # Create FastAPI app
 app = FastAPI(
@@ -52,6 +55,19 @@ async def root():
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "lifepilot-api"}
+
+@app.websocket("/ws/notifications/{user_id}")
+async def websocket_notifications(websocket: WebSocket, user_id: str):
+    """WebSocket endpoint for real-time notifications"""
+    await notification_manager.connect(websocket, user_id)
+    try:
+        while True:
+            # Keep connection alive and listen for messages
+            data = await websocket.receive_text()
+            logger.debug("WebSocket message received", user_id=user_id, data=data)
+    except WebSocketDisconnect:
+        notification_manager.disconnect(websocket, user_id)
+        logger.info("WebSocket disconnected", user_id=user_id)
 
 if __name__ == "__main__":
     import uvicorn

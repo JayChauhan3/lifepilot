@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/Button'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
+import { StructuredDataView } from '@/components/chat/StructuredDataView'
+
 interface MessageItemProps {
   message: Message
 }
@@ -58,8 +60,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
         </div>
 
         <div className={`relative rounded-2xl p-4 backdrop-blur-sm border transition-all duration-200 hover:shadow-xl ${isUser
-            ? 'bg-[#303030] border-white/20 ml-auto'
-            : 'bg-white/10 border-white/20'
+          ? 'bg-[#303030] border-white/20 ml-auto'
+          : 'bg-white/10 border-white/20'
           }`}>
           <div className={`text-sm leading-relaxed ${isUser ? 'text-white' : 'text-gray-200'}`}>
             <ReactMarkdown
@@ -119,80 +121,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
               </div>
             </div>
           )}
-
-          {isToolOutput && message.structuredData && (
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-400">Structured Data</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleStructuredData(message.id)}
-                  className="text-xs text-gray-400 hover:text-white"
-                >
-                  {message.showStructuredData ? 'Hide' : 'Show'} JSON
-                </Button>
-              </div>
-
-              {message.showStructuredData ? (
-                <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700">
-                  <pre className="text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap">
-                    {JSON.stringify(message.structuredData, null, 2)}
-                  </pre>
-                </div>
-              ) : (
-                <StructuredDataDisplay data={message.structuredData} />
-              )}
-            </div>
-          )}
         </div>
       </div>
-    </div>
-  )
-}
-
-interface StructuredDataDisplayProps {
-  data: any
-}
-
-const StructuredDataDisplay: React.FC<StructuredDataDisplayProps> = ({ data }) => {
-  if (data.items && Array.isArray(data.items)) {
-    return (
-      <div className="space-y-3">
-        {data.items.map((category: any, index: number) => (
-          <div key={index} className="bg-white/5 rounded-xl p-3 border border-white/10">
-            <h4 className="font-medium text-white mb-2">{category.category}</h4>
-            <div className="flex flex-wrap gap-2">
-              {category.items.map((item: string, itemIndex: number) => (
-                <span
-                  key={itemIndex}
-                  className="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-white/10 border border-white/20 text-gray-300"
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
-        {data.totalItems && (
-          <div className="text-sm text-gray-400 border-t border-white/10 pt-2">
-            Total items: {data.totalItems}
-          </div>
-        )}
-        {data.estimatedCost && (
-          <div className="text-sm text-gray-400">
-            Estimated cost: {data.estimatedCost}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-      <pre className="text-sm text-gray-300 whitespace-pre-wrap">
-        {JSON.stringify(data, null, 2)}
-      </pre>
     </div>
   )
 }

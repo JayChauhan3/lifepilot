@@ -14,6 +14,7 @@ from .executor import ExecutorAgent
 from .knowledge import KnowledgeAgent
 from .memory import MemoryAgent
 from .analyzer import AnalyzerAgent
+from .ui_agent import UIAgent
 
 logger = structlog.get_logger()
 
@@ -25,6 +26,7 @@ class RouterAgent:
         self.knowledge = KnowledgeAgent()
         self.memory = MemoryAgent()
         self.analyzer = AnalyzerAgent()
+        self.ui_agent = UIAgent()
         
         # Core services
         self.session_service = SessionService()
@@ -123,6 +125,16 @@ class RouterAgent:
             r'further\s+information'
         ]
         
+        # UI patterns
+        ui_patterns = [
+            r'show\s+(my\s+)?dashboard',
+            r'display\s+(my\s+)?dashboard',
+            r'open\s+(my\s+)?dashboard',
+            r'view\s+(my\s+)?dashboard',
+            r'show\s+ui',
+            r'show\s+interface'
+        ]
+
         # Error handling patterns
         error_patterns = [
             r'error',
@@ -172,7 +184,12 @@ class RouterAgent:
             if re.search(pattern, message_lower):
                 return "context_continuation"
                 
-        # 6. Error Handling
+        # 6. UI Requests
+        for pattern in ui_patterns:
+            if re.search(pattern, message_lower):
+                return "ui_request"
+
+        # 7. Error Handling
         for pattern in error_patterns:
             if re.search(pattern, message_lower):
                 return "error_handling"
@@ -330,6 +347,28 @@ class RouterAgent:
                     f"Analyze this error or issue and provide real debugging help: {message}"
                 )
                 logger.info("Error handling completed", user_id=user_id)
+                
+            elif message_type == "ui_request":
+                logger.info("Processing UI request", user_id=user_id)
+                agent_used = "ui_agent"
+                tools_used = ["dashboard_generator"]
+                
+                # Generate dashboard data
+                dashboard_response = await self.ui_agent.generate_dashboard(user_id)
+                dashboard_data = dashboard_response.payload
+                
+                # Set friendly text response
+                final_response = "I've generated your dashboard. You can view your tasks, weather, and daily plan below."
+                
+                # Return response with data payload
+                return {
+                    "response": final_response,
+                    "agent_used": agent_used,
+                    "tools_used": tools_used,
+                    "processing_time": time.time() - start_time,
+                    "message_type": message_type,
+                    "data": dashboard_data
+                }
                 
             else:
                 logger.info("Processing general conversation", user_id=user_id)

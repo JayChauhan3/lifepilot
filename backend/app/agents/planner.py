@@ -19,7 +19,7 @@ class PlannerAgent:
         self.memory_bank = MemoryBank()
         self.compactor = get_compactor()
     
-    async def create_plan(self, user_message: str, user_id: str = "default", shopping_tool: ShoppingTool = None) -> AgentMessage:
+    async def create_plan(self, user_message: str, user_id: str = "default", shopping_tool: ShoppingTool = None, context: Dict[str, Any] = None) -> AgentMessage:
         """Create a plan based on user message using RAG"""
         logger.info("Creating plan", user_message=user_message, user_id=user_id)
         
@@ -230,3 +230,32 @@ class PlannerAgent:
         
         logger.info("Shopping recommendations retrieved", query=query, count=len(recommendations))
         return recommendations
+
+    async def process_task(self, task: str, context: Dict[str, Any] = None) -> AgentMessage:
+        """Process a generic planning task"""
+        logger.info("Processing planning task", task=task)
+        
+        # Use LLM to perform the planning task
+        try:
+            response = self.llm_service.generate_text(
+                f"Perform the following planning task: {task}. Provide the result.",
+                max_tokens=500
+            )
+            result = response
+            status = "completed"
+        except Exception as e:
+            logger.error("Failed to process planning task", error=str(e))
+            result = f"Failed to process task: {str(e)}"
+            status = "failed"
+            
+        return AgentMessage(
+            sender="planner",
+            receiver="orchestrator",
+            type="PLANNING_RESULT",
+            payload={
+                "task": task,
+                "result": result,
+                "status": status,
+                "timestamp": datetime.now().isoformat()
+            }
+        )

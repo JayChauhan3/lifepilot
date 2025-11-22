@@ -12,6 +12,7 @@ export interface ChatResponse {
   tools_used?: string[];
   processing_time?: number;
   message_type?: string;
+  data?: Record<string, any>;
 }
 
 export interface WorkflowRequest {
@@ -50,7 +51,7 @@ export class ApiClient {
       // Return a temporary ID for server-side rendering
       return 'temp_ssr_user_id';
     }
-    
+
     // Try to get from localStorage first
     let userId = localStorage.getItem('lifepilot_user_id');
     if (!userId) {
@@ -67,7 +68,7 @@ export class ApiClient {
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     console.log('Making request to:', url);
-    
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
@@ -104,7 +105,7 @@ export class ApiClient {
   async chat(message: string): Promise<ChatResponse> {
     console.log('Making chat request to:', `${this.baseURL}/api/chat`);
     console.log('Request payload:', { user_id: this.userId, message });
-    
+
     const response = await this.request<ChatResponse>('/api/chat', {
       method: 'POST',
       body: JSON.stringify({
@@ -158,7 +159,7 @@ export class ApiClient {
 
   async *chatStream(message: string): AsyncGenerator<{ type: string; data: string | unknown }, void, unknown> {
     const url = `${this.baseURL}/api/chat/stream`;
-    
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };

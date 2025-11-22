@@ -11,47 +11,19 @@ export const ChatContainer: React.FC = () => {
     <div className="relative h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
       {/* Animated background gradient */}
       <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-pink-600/10 animate-pulse"></div>
-      
-      {/* Header - Fixed with glassmorphism */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-6 md:px-20 py-2 bg-black/20 backdrop-blur-md border-b border-white/10">
-        <div className="flex items-center space-x-3">
-          <div className="w-6 h-6 bg-black rounded flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-white">LifePilot</h1>
-          </div>
-        </div>
-        <div className="flex items-center space-x-1">
-          <button
-            onClick={toggleSystemPrompt}
-            className="px-2 py-1 text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded transition-all duration-200 backdrop-blur-sm border border-white/20 md:px-3 md:py-1.5 md:text-sm"
-          >
-            System
-          </button>
-          <button
-            onClick={clearMessages}
-            className="px-2 py-1 text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded transition-all duration-200 backdrop-blur-sm border border-white/20 md:px-3 md:py-1.5 md:text-sm"
-          >
-            Clear
-          </button>
-        </div>
-      </div>
-      
+
       {/* Messages Area - Full height scrollable */}
       <div className="absolute inset-0 overflow-y-auto">
         <MessageList />
       </div>
-      
+
       {/* Input Area - Fixed at bottom with glassmorphism */}
       <div className="absolute bottom-0 left-0 right-0 z-10">
         <div className="max-w-4xl mx-auto px-6 md:px-20 py-6">
           <ChatInput />
         </div>
       </div>
-      
+
       {/* System Prompt Editor - Enhanced popup */}
       {isSystemPromptExpanded && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6">

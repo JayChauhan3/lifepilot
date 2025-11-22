@@ -19,6 +19,8 @@ from app.agents.executor import ExecutorAgent
 from app.agents.router import RouterAgent
 from app.agents.analyzer import AnalyzerAgent
 from app.agents.knowledge import KnowledgeAgent
+from app.agents.notifications import NotificationAgent
+from app.agents.ui_agent import UIAgent
 from app.agents.routine_agent import routine_agent
 
 logger = structlog.get_logger()
@@ -85,13 +87,28 @@ class MultiAgentOrchestrator:
             "router": RouterAgent(),
             "analyzer": AnalyzerAgent(),
             "knowledge": KnowledgeAgent(),
+            "notifications": NotificationAgent(),
+            "ui": UIAgent(),
             "routine": routine_agent
         }
         
         # Start routine agent scheduler
-        asyncio.create_task(routine_agent.start_scheduler())
+        # Moved to start() method to avoid side effects during import
+        # asyncio.create_task(routine_agent.start_scheduler())
         
         logger.info("Multi-agent orchestrator initialized", agents=list(self.agents.keys()))
+    
+    async def start(self):
+        """Start the orchestrator and background tasks"""
+        logger.info("Starting orchestrator background tasks")
+        # Start routine agent scheduler
+        # We use create_task to run it in background without blocking
+        self._scheduler_task = asyncio.create_task(routine_agent.start_scheduler())
+        
+    async def stop(self):
+        """Stop the orchestrator and background tasks"""
+        logger.info("Stopping orchestrator background tasks")
+        await routine_agent.stop_scheduler()
     
     @trace_function("orchestrator.create_workflow")
     async def create_workflow(self, user_id: str, request: str, context: Optional[Dict[str, Any]] = None) -> str:
@@ -114,7 +131,13 @@ class MultiAgentOrchestrator:
             )
             
             # Convert plan to workflow steps
-            steps = self._plan_to_steps(planner_result.get("plan", {}))
+            # Handle AgentMessage response
+            if hasattr(planner_result, 'payload'):
+                plan_data = planner_result.payload
+            else:
+                plan_data = planner_result.get("plan", planner_result)
+                
+            steps = self._plan_to_steps(plan_data)
             
             # Create workflow
             workflow = Workflow(
@@ -293,13 +316,26 @@ class MultiAgentOrchestrator:
         
         # Process message through agent
         if hasattr(agent, 'process_message'):
-            result = await agent.process_message(message)
+            # RouterAgent.process_message expects (user_id, message: str)
+            if agent_type == "router":
+                user_id = parameters.get("user_id", "default_user")
+                # For RouterAgent, the 'message' is the action description
+                result = await agent.process_message(user_id, action)
+            else:
+                result = await agent.process_message(message)
         elif hasattr(agent, action):
             method = getattr(agent, action)
             if asyncio.iscoroutinefunction(method):
                 result = await method(**parameters)
             else:
                 result = method(**parameters)
+        elif hasattr(agent, 'process_task'):
+            # Fallback for generic tasks
+            # Pass the action description as the task
+            task_desc = action
+            if parameters:
+                task_desc += f" with details: {parameters}"
+            result = await agent.process_task(task_desc)
         else:
             raise ValueError(f"Agent {agent_type} doesn't support action {action}")
         
@@ -313,12 +349,25 @@ class MultiAgentOrchestrator:
         plan_steps = plan.get("steps", [])
         
         for i, plan_step in enumerate(plan_steps):
+            if isinstance(plan_step, str):
+                action = plan_step
+                details = {}
+            elif hasattr(plan_step, 'payload'): # Handle AgentMessage
+                action = plan_step.payload.get("action", "Unknown Action")
+                details = plan_step.payload.get("details", {})
+            else:
+                action = plan_step.get("action", str(plan_step))
+                details = plan_step.get("details", {})
+                
+            # Ensure action is a string for agent determination
+            action_str = action if isinstance(action, str) else str(action)
+            
             step = WorkflowStep(
                 step_id=f"step_{i+1}",
-                name=plan_step.get("action", f"Step {i+1}"),
-                agent_type=self._determine_agent_for_action(plan_step.get("action", "")),
-                action=plan_step.get("action", ""),
-                parameters=plan_step.get("details", {}),
+                name=action_str,
+                agent_type=self._determine_agent_for_action(action_str),
+                action=action_str,
+                parameters=details,
                 dependencies=[f"step_{i}"] if i > 0 else []
             )
             steps.append(step)
@@ -327,16 +376,26 @@ class MultiAgentOrchestrator:
     
     def _determine_agent_for_action(self, action: str) -> str:
         """Determine which agent should handle an action"""
+        # Ensure action is a string
+        if hasattr(action, 'payload'):
+            action = action.payload.get("action", str(action))
+        elif not isinstance(action, str):
+            action = str(action)
+            
         action_lower = action.lower()
         
-        if any(keyword in action_lower for keyword in ["plan", "schedule", "organize"]):
+        if any(keyword in action_lower for keyword in ["plan", "organize"]):
             return "planner"
-        elif any(keyword in action_lower for keyword in ["execute", "perform", "do", "complete"]):
+        elif any(keyword in action_lower for keyword in ["execute", "perform", "do", "complete", "schedule", "availability"]):
             return "executor"
         elif any(keyword in action_lower for keyword in ["search", "find", "lookup", "research"]):
             return "knowledge"
-        elif any(keyword in action_lower for keyword in ["analyze", "understand", "interpret"]):
+        elif any(keyword in action_lower for keyword in ["analyze", "understand", "interpret", "summary"]):
             return "analyzer"
+        elif any(keyword in action_lower for keyword in ["notify", "alert", "remind", "send"]):
+            return "notifications"
+        elif any(keyword in action_lower for keyword in ["show", "display", "render", "dashboard"]):
+            return "ui"
         else:
             return "router"  # Default to router
     

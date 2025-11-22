@@ -1,5 +1,6 @@
 # Executor Agent
 import structlog
+from typing import Dict, Any
 from datetime import datetime, timedelta
 from ..core.a2a import A2AProtocol
 from ..schemas import AgentMessage, ExecutionPayload
@@ -11,6 +12,10 @@ class ExecutorAgent:
     def __init__(self):
         logger.info("ExecutorAgent initialized")
         self.calendar_tool = CalendarTool()
+        
+    async def process_task(self, task: str, context: Dict[str, Any] = None) -> AgentMessage:
+        """Process a generic execution task (alias for execute_task)"""
+        return await self.execute_task(task)
     
     async def execute_task(self, task: str, calendar_tool: CalendarTool = None) -> AgentMessage:
         """Execute a task using calendar tool for scheduling"""

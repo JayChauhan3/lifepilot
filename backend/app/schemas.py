@@ -12,6 +12,7 @@ class ChatResponse(BaseModel):
     tools_used: Optional[List[str]] = []
     processing_time: Optional[float] = None
     message_type: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
 
 class AgentMessage(BaseModel):
     sender: str

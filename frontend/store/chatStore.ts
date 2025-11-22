@@ -34,7 +34,7 @@ interface ChatStore {
   streamingContent: string
   isStreaming: boolean
   error: string | null
-  
+
   // Actions
   addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void
   setLoading: (loading: boolean) => void
@@ -116,35 +116,35 @@ export const useChatStore = create<ChatStore>()(
           messages: [...state.messages, newMessage],
         }))
       },
-      
+
       setLoading: (loading) => set({ isLoading: loading }),
-      
+
       setTyping: (typing) => set({ isTyping: typing }),
-      
+
       setInputValue: (value) => set({ inputValue: value }),
-      
+
       setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
-      
-      toggleSystemPrompt: () => set((state) => ({ 
-        isSystemPromptExpanded: !state.isSystemPromptExpanded 
+
+      toggleSystemPrompt: () => set((state) => ({
+        isSystemPromptExpanded: !state.isSystemPromptExpanded
       })),
-      
+
       clearMessages: () => set({ messages: [] }),
-      
+
       sendMessage: async () => {
         const { inputValue, addMessage, setLoading, setInputValue, setError } = get()
         if (!inputValue.trim()) return
-        
+
         // Add user message
         addMessage({
           content: inputValue,
           role: 'user',
         })
-        
+
         setInputValue('')
         setLoading(true)
         setError(null)
-        
+
         try {
           const response = await apiClient.chat(inputValue)
           addMessage({
@@ -154,6 +154,8 @@ export const useChatStore = create<ChatStore>()(
             toolsUsed: response.tools_used,
             processingTime: response.processing_time,
             messageType: response.message_type,
+            structuredData: response.data,
+            showStructuredData: !!response.data,
           })
         } catch (error) {
           console.error('Chat error:', error)
@@ -170,17 +172,17 @@ export const useChatStore = create<ChatStore>()(
       sendMessageStreaming: async () => {
         const { inputValue, addMessage, startStreaming, stopStreaming, setInputValue, setError, updateStreamingContent } = get()
         if (!inputValue.trim()) return
-        
+
         // Add user message
         addMessage({
           content: inputValue,
           role: 'user',
         })
-        
+
         setInputValue('')
         setError(null)
         startStreaming()
-        
+
         // Add empty assistant message for streaming
         const assistantMessageId = crypto.randomUUID()
         set((state) => ({
@@ -191,17 +193,17 @@ export const useChatStore = create<ChatStore>()(
             timestamp: new Date(),
           }]
         }))
-        
+
         try {
           let accumulatedContent = ''
           for await (const chunk of apiClient.chatStream(inputValue)) {
             accumulatedContent += chunk
             updateStreamingContent(accumulatedContent)
-            
+
             // Update the message in real-time
             set((state) => ({
-              messages: state.messages.map(msg => 
-                msg.id === assistantMessageId 
+              messages: state.messages.map(msg =>
+                msg.id === assistantMessageId
                   ? { ...msg, content: accumulatedContent }
                   : msg
               )
@@ -210,11 +212,11 @@ export const useChatStore = create<ChatStore>()(
         } catch (error) {
           console.error('Streaming error:', error)
           setError(error instanceof Error ? error.message : 'Failed to stream response')
-          
+
           // Update with error message
           set((state) => ({
-            messages: state.messages.map(msg => 
-              msg.id === assistantMessageId 
+            messages: state.messages.map(msg =>
+              msg.id === assistantMessageId
                 ? { ...msg, content: 'Sorry, I encountered an error while processing your message. Please try again.' }
                 : msg
             )
@@ -223,15 +225,15 @@ export const useChatStore = create<ChatStore>()(
           stopStreaming()
         }
       },
-      
+
       startStreaming: () => set({ isStreaming: true, streamingContent: '' }),
-      
+
       updateStreamingContent: (content) => set({ streamingContent: content }),
-      
+
       stopStreaming: () => set({ isStreaming: false, streamingContent: '' }),
-      
+
       setError: (error) => set({ error }),
-      
+
       retryLastMessage: async () => {
         const { messages, sendMessage, setInputValue } = get()
         const lastUserMessage = messages.filter(m => m.role === 'user').pop()
@@ -240,10 +242,10 @@ export const useChatStore = create<ChatStore>()(
           await sendMessage()
         }
       },
-      
+
       toggleStructuredData: (messageId) => set((state) => ({
-        messages: state.messages.map(msg => 
-          msg.id === messageId 
+        messages: state.messages.map(msg =>
+          msg.id === messageId
             ? { ...msg, showStructuredData: !msg.showStructuredData }
             : msg
         )

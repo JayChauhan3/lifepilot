@@ -210,17 +210,22 @@ class RoutineAgent:
         """Check for pending notifications and send them"""
         logger.info("Checking notifications")
         
-        # Send message to router to check notifications
-        message = self.a2a_protocol.create_message(
-            sender="routine_agent",
-            receiver="router_agent",
-            message_type="check_notifications",
-            payload={"action": "check_pending"}
-        )
+        # Use NotificationAgent to send alerts
+        # In a real scenario, we might check a DB for pending alerts
+        # For now, we'll simulate a periodic check
         
-        # This would normally be sent via message queue or direct call
-        # For now, we'll just log
-        logger.info("Notification check completed", message=message.to_dict())
+        from app.agents.notifications import NotificationAgent
+        # Note: In a real app, we should inject this or get it from a container
+        # For now, we'll instantiate it or use a singleton if available
+        notification_agent = NotificationAgent()
+        
+        # Check for pending alerts (this is just a placeholder logic)
+        # We could also generate system alerts here
+        
+        # Example: Send a heartbeat alert if needed
+        # await notification_agent.send_alert("system", "Routine check completed", "low")
+        
+        logger.info("Notification check completed")
     
     async def _cleanup_tasks(self):
         """Clean up old completed tasks"""
