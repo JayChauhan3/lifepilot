@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { usePlannerStore } from "../../store/plannerStore";
 import { Routine } from "../../types/planner";
 import RoutineModal from "../planner/RoutineModal";
+import ConfirmationModal from "../planner/ConfirmationModal";
 
 // Helper to map icon string to component
 const ICON_MAP: Record<string, any> = {
@@ -64,6 +65,20 @@ export default function RoutinesView() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRoutine, setEditingRoutine] = useState<Routine | undefined>(undefined);
 
+    // Confirmation State
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        isDanger?: boolean;
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { },
+    });
+
     useEffect(() => {
         fetchRoutines();
     }, [fetchRoutines]);
@@ -86,10 +101,14 @@ export default function RoutinesView() {
         }
     };
 
-    const handleDeleteRoutine = async (id: string) => {
-        if (window.confirm('Are you sure you want to delete this routine?')) {
-            await deleteRoutine(id);
-        }
+    const handleDeleteRoutine = (id: string) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Delete Routine?',
+            message: 'Are you sure you want to delete this routine? This action cannot be undone.',
+            onConfirm: () => deleteRoutine(id),
+            isDanger: true,
+        });
     };
 
     return (
@@ -126,6 +145,16 @@ export default function RoutinesView() {
                 onSave={handleSaveRoutine}
                 onDelete={handleDeleteRoutine}
                 initialData={editingRoutine}
+            />
+
+            <ConfirmationModal
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                isDanger={confirmConfig.isDanger}
+                confirmText="Delete"
             />
         </div>
     );

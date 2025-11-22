@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { usePlannerStore } from "../../store/plannerStore";
 import { Task, TaskType } from "../../types/planner";
 import TaskModal from "../planner/TaskModal";
+import ConfirmationModal from "../planner/ConfirmationModal";
 
 const COLUMNS: { id: TaskType; title: string }[] = [
     { id: "today", title: "Today" },
@@ -20,8 +21,19 @@ export default function KanbanBoard() {
     const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
     const [modalDefaultType, setModalDefaultType] = useState<TaskType>('today');
 
-    // Confirmation Popup State
-    const [confirmTask, setConfirmTask] = useState<Task | null>(null);
+    // Confirmation State
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        isDanger?: boolean;
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { },
+    });
 
     useEffect(() => {
         fetchTasks();
@@ -47,28 +59,37 @@ export default function KanbanBoard() {
     };
 
     const handleDeleteAll = (type: TaskType) => {
-        if (window.confirm(`Are you sure you want to delete all tasks in ${type}?`)) {
-            deleteTasksByType(type);
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Delete All Tasks?',
+            message: `Are you sure you want to delete all tasks in ${type}? This action cannot be undone.`,
+            onConfirm: () => deleteTasksByType(type),
+            isDanger: true,
+        });
+    };
+
+    const handleDeleteTask = (task: Task) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Delete Task?',
+            message: `Are you sure you want to delete "${task.title}"?`,
+            onConfirm: () => deleteTask(task.id),
+            isDanger: true,
+        });
     };
 
     const handleCheckboxClick = (task: Task, e: React.MouseEvent) => {
         e.stopPropagation();
         if (task.type === 'today' && !task.isCompleted) {
-            setConfirmTask(task);
+            setConfirmConfig({
+                isOpen: true,
+                title: 'Are you finished with this task?',
+                message: `"${task.title}" will be moved to Done.`,
+                onConfirm: () => toggleTaskCompletion(task.id),
+                isDanger: false,
+            });
         } else {
-            // For other types or if already done, just toggle (or maybe disable for done?)
-            // Requirement says: "Today -> Done ... Only after checkbox confirmation"
-            // For Done -> Today (uncheck), requirement doesn't specify, but usually allowed.
-            // Let's allow unchecking without popup.
             toggleTaskCompletion(task.id);
-        }
-    };
-
-    const confirmCompletion = async () => {
-        if (confirmTask) {
-            await toggleTaskCompletion(confirmTask.id);
-            setConfirmTask(null);
         }
     };
 
@@ -116,7 +137,7 @@ export default function KanbanBoard() {
                                             onClick={() => handleEditTask(task)}
                                             onDelete={(e) => {
                                                 e.stopPropagation();
-                                                deleteTask(task.id);
+                                                handleDeleteTask(task);
                                             }}
                                             onCheckboxClick={(e) => handleCheckboxClick(task, e)}
                                         />
@@ -146,43 +167,15 @@ export default function KanbanBoard() {
                 defaultType={modalDefaultType}
             />
 
-            {/* Confirmation Popup */}
-            <AnimatePresence>
-                {confirmTask && (
-                    <>
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50"
-                            onClick={() => setConfirmTask(null)}
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="fixed inset-0 m-auto w-full max-w-sm h-fit bg-white rounded-2xl shadow-xl z-50 p-6 text-center"
-                        >
-                            <h3 className="text-lg font-bold text-gray-900 mb-2">Are you finished with this task?</h3>
-                            <p className="text-gray-500 text-sm mb-6">"{confirmTask.title}" will be moved to Done.</p>
-                            <div className="flex gap-3 justify-center">
-                                <button
-                                    onClick={() => setConfirmTask(null)}
-                                    className="px-6 py-2 rounded-xl border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 transition-colors"
-                                >
-                                    NO
-                                </button>
-                                <button
-                                    onClick={confirmCompletion}
-                                    className="px-6 py-2 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-700 transition-colors shadow-sm shadow-primary-200"
-                                >
-                                    YES
-                                </button>
-                            </div>
-                        </motion.div>
-                    </>
-                )}
-            </AnimatePresence>
+            <ConfirmationModal
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                isDanger={confirmConfig.isDanger}
+                confirmText={confirmConfig.isDanger ? 'Delete' : 'Yes'}
+            />
         </div>
     );
 }
