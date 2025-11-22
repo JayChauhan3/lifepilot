@@ -1,18 +1,19 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { FiPlay, FiEdit2, FiClock, FiRepeat, FiSun, FiMoon, FiBriefcase, FiActivity, FiBook, FiPlus } from "react-icons/fi";
 import clsx from "clsx";
+import { usePlannerStore } from "../../store/plannerStore";
+import { Routine } from "../../types/planner";
+import RoutineModal from "../planner/RoutineModal";
 
-const ROUTINES = [
-    { id: 1, title: "Morning Routine", time: "8:00 AM", duration: "45m", icon: FiSun, type: "morning", nextRun: "Tomorrow, 8:00 AM" },
-    { id: 2, title: "Deep Work Block", time: "9:00 AM", duration: "2h", icon: FiBriefcase, type: "work", nextRun: "Tomorrow, 9:00 AM" },
-    { id: 3, title: "Gym Workout", time: "5:30 PM", duration: "1h", icon: FiActivity, type: "health", nextRun: "Today, 5:30 PM" },
-    { id: 4, title: "Evening Wind Down", time: "9:30 PM", duration: "30m", icon: FiMoon, type: "evening", nextRun: "Today, 9:30 PM" },
-    { id: 5, title: "Reading Time", time: "10:00 PM", duration: "30m", icon: FiBook, type: "leisure", nextRun: "Today, 10:00 PM" },
-];
+// Helper to map icon string to component
+const ICON_MAP: Record<string, any> = {
+    FiSun, FiMoon, FiBriefcase, FiActivity, FiBook
+};
 
-// Static style map for routines
+// Static style map for routines (can be dynamic later)
 const ROUTINE_STYLES: Record<string, { iconBg: string, iconColor: string, buttonBg: string, buttonText: string, gradient: string }> = {
     morning: {
         iconBg: "bg-amber-100",
@@ -48,21 +49,69 @@ const ROUTINE_STYLES: Record<string, { iconBg: string, iconColor: string, button
         buttonBg: "bg-rose-100",
         buttonText: "text-rose-700",
         gradient: "bg-rose-500"
+    },
+    default: {
+        iconBg: "bg-gray-100",
+        iconColor: "text-gray-600",
+        buttonBg: "bg-gray-100",
+        buttonText: "text-gray-700",
+        gradient: "bg-gray-500"
     }
 };
 
 export default function RoutinesView() {
+    const { routines, fetchRoutines, addRoutine, updateRoutine, deleteRoutine } = usePlannerStore();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingRoutine, setEditingRoutine] = useState<Routine | undefined>(undefined);
+
+    useEffect(() => {
+        fetchRoutines();
+    }, [fetchRoutines]);
+
+    const handleAddRoutine = () => {
+        setEditingRoutine(undefined);
+        setIsModalOpen(true);
+    };
+
+    const handleEditRoutine = (routine: Routine) => {
+        setEditingRoutine(routine);
+        setIsModalOpen(true);
+    };
+
+    const handleSaveRoutine = async (routineData: any) => {
+        if (editingRoutine) {
+            await updateRoutine(editingRoutine.id, routineData);
+        } else {
+            await addRoutine(routineData);
+        }
+    };
+
+    const handleDeleteRoutine = async (id: string) => {
+        if (window.confirm('Are you sure you want to delete this routine?')) {
+            await deleteRoutine(id);
+        }
+    };
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {ROUTINES.map((routine, index) => (
-                <RoutineCard key={routine.id} routine={routine} index={index} />
-            ))}
+            <AnimatePresence mode="popLayout">
+                {routines.map((routine, index) => (
+                    <RoutineCard
+                        key={routine.id}
+                        routine={routine}
+                        index={index}
+                        onEdit={() => handleEditRoutine(routine)}
+                    />
+                ))}
+            </AnimatePresence>
 
             {/* Add New Routine Card */}
             <motion.button
+                layout
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.3 }}
+                onClick={handleAddRoutine}
                 className="flex flex-col items-center justify-center h-full min-h-[200px] rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/50 text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50/30 transition-all group"
             >
                 <div className="w-12 h-12 rounded-full bg-white border border-gray-200 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
@@ -70,18 +119,38 @@ export default function RoutinesView() {
                 </div>
                 <span className="font-medium">Create New Routine</span>
             </motion.button>
+
+            <RoutineModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSave={handleSaveRoutine}
+                onDelete={handleDeleteRoutine}
+                initialData={editingRoutine}
+            />
         </div>
     );
 }
 
-function RoutineCard({ routine, index }: { routine: any, index: number }) {
-    const Icon = routine.icon;
-    const styles = ROUTINE_STYLES[routine.type] || ROUTINE_STYLES.morning;
+function RoutineCard({ routine, index, onEdit }: { routine: Routine, index: number, onEdit: () => void }) {
+    const Icon = ICON_MAP[routine.icon || 'FiActivity'] || FiActivity;
+
+    // Determine style based on title keywords or default
+    let styleKey = 'default';
+    const lowerTitle = routine.title.toLowerCase();
+    if (lowerTitle.includes('morning')) styleKey = 'morning';
+    else if (lowerTitle.includes('work') || lowerTitle.includes('deep')) styleKey = 'work';
+    else if (lowerTitle.includes('gym') || lowerTitle.includes('health') || lowerTitle.includes('workout')) styleKey = 'health';
+    else if (lowerTitle.includes('evening') || lowerTitle.includes('night')) styleKey = 'evening';
+    else if (lowerTitle.includes('read') || lowerTitle.includes('book')) styleKey = 'leisure';
+
+    const styles = ROUTINE_STYLES[styleKey];
 
     return (
         <motion.div
+            layout
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             transition={{ delay: index * 0.1 }}
             className="bg-white rounded-2xl p-6 shadow-soft border border-gray-100 hover:shadow-medium transition-all duration-300 group relative overflow-hidden"
         >
@@ -101,7 +170,10 @@ function RoutineCard({ routine, index }: { routine: any, index: number }) {
                         <Icon size={24} />
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-2 group-hover:translate-x-0">
-                        <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+                        <button
+                            onClick={onEdit}
+                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
                             <FiEdit2 size={16} />
                         </button>
                     </div>
@@ -112,7 +184,7 @@ function RoutineCard({ routine, index }: { routine: any, index: number }) {
                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-6">
                     <div className="flex items-center gap-1.5">
                         <FiClock size={14} />
-                        <span>{routine.time}</span>
+                        <span>{routine.startTime}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <FiRepeat size={14} />
