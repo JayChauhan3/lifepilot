@@ -141,7 +141,7 @@ export default function RoutineModal({ isOpen, onClose, onSave, onDelete, initia
 
                                 {/* Actions */}
                                 <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                                    {initialData ? (
+                                    {initialData && !/\bwork\b/i.test(initialData.title) ? (
                                         <button
                                             type="button"
                                             onClick={handleDelete}

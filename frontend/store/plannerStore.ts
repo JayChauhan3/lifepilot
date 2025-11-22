@@ -118,18 +118,36 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const routines = await plannerService.getRoutines();
+            let finalRoutines = routines;
+
+            // Initialize with some dummy data if empty for demo purposes
             if (routines.length === 0) {
-                const dummyRoutines: Routine[] = [
+                finalRoutines = [
                     { id: '1', title: "Morning Routine", startTime: "08:00", duration: "45m", nextRun: "Tomorrow, 8:00 AM", icon: "FiSun" },
-                    { id: '2', title: "Deep Work Block", startTime: "09:00", duration: "2h", nextRun: "Tomorrow, 9:00 AM", icon: "FiBriefcase" },
+                    { id: '2', title: "Deep Work Block", startTime: "09:00", duration: "8h", nextRun: "Tomorrow, 9:00 AM", icon: "FiBriefcase" }, // Changed to 8h for demo
                     { id: '3', title: "Gym Workout", startTime: "17:30", duration: "1h", nextRun: "Today, 5:30 PM", icon: "FiActivity" },
                     { id: '4', title: "Evening Wind Down", startTime: "21:30", duration: "30m", nextRun: "Today, 9:30 PM", icon: "FiMoon" },
                     { id: '5', title: "Reading Time", startTime: "22:00", duration: "30m", nextRun: "Today, 10:00 PM", icon: "FiBook" },
                 ];
-                set({ routines: dummyRoutines, isLoading: false });
-            } else {
-                set({ routines, isLoading: false });
             }
+
+            // Ensure "Work" routine exists
+            const hasWorkRoutine = finalRoutines.some(r => r.title.toLowerCase().includes('work'));
+            if (!hasWorkRoutine) {
+                const workRoutine: Routine = {
+                    id: 'work-routine-default',
+                    title: "Work Block",
+                    startTime: "09:00",
+                    duration: "8h",
+                    nextRun: "Tomorrow, 9:00 AM",
+                    icon: "FiBriefcase"
+                };
+                finalRoutines = [...finalRoutines, workRoutine];
+                // In real app, we should persist this creation
+                // await plannerService.createRoutine(workRoutine); 
+            }
+
+            set({ routines: finalRoutines, isLoading: false });
         } catch (error) {
             set({ error: 'Failed to fetch routines', isLoading: false });
         }
@@ -161,6 +179,14 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     deleteRoutine: async (id) => {
         set({ isLoading: true, error: null });
         try {
+            const routineToDelete = get().routines.find(r => r.id === id);
+            if (routineToDelete && routineToDelete.title.toLowerCase().includes('work')) {
+                // Prevent deleting work routine
+                // We could throw an error or just return, but let's set error state to notify UI if needed
+                set({ error: 'Cannot delete the mandatory Work routine', isLoading: false });
+                return;
+            }
+
             await plannerService.deleteRoutine(id);
             set((state) => ({
                 routines: state.routines.filter((r) => r.id !== id),
