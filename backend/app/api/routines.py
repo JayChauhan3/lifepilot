@@ -1,0 +1,87 @@
+from fastapi import APIRouter, HTTPException, Query, Depends
+from typing import List, Optional
+import structlog
+from app.services.routine_service import RoutineService
+from app.models import RoutineModel, UserModel
+from app.api.dependencies import get_current_user
+from pydantic import BaseModel
+
+router = APIRouter()
+logger = structlog.get_logger()
+routine_service = RoutineService()
+
+class RoutineCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    frequency: str = "daily"
+    time_of_day: Optional[str] = None
+    days_of_week: List[str] = []
+    is_active: bool = True
+
+class RoutineUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    frequency: Optional[str] = None
+    time_of_day: Optional[str] = None
+    days_of_week: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+@router.post("/routines", response_model=RoutineModel)
+async def create_routine(routine: RoutineCreate, current_user: UserModel = Depends(get_current_user)):
+    """Create a new routine"""
+    try:
+        created_routine = await routine_service.create_routine(current_user.user_id, routine.model_dump())
+        logger.info("Routine created", routine_id=str(created_routine.id), user_id=current_user.user_id)
+        return created_routine
+    except Exception as e:
+        logger.error("Failed to create routine", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/routines", response_model=List[RoutineModel])
+async def get_routines(current_user: UserModel = Depends(get_current_user)):
+    """Get all routines for authenticated user"""
+    try:
+        routines = await routine_service.get_routines(current_user.user_id)
+        logger.info("Routines retrieved", count=len(routines), user_id=current_user.user_id)
+        return routines
+    except Exception as e:
+        logger.error("Failed to get routines", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/routines/{routine_id}", response_model=RoutineModel)
+async def update_routine(
+    routine_id: str,
+    routine_update: RoutineUpdate,
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Update a routine"""
+    try:
+        updates = routine_update.model_dump(exclude_unset=True)
+        updated_routine = await routine_service.update_routine(current_user.user_id, routine_id, updates)
+        
+        if not updated_routine:
+            raise HTTPException(status_code=404, detail="Routine not found")
+            
+        logger.info("Routine updated", routine_id=routine_id, user_id=current_user.user_id)
+        return updated_routine
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to update routine", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/routines/{routine_id}")
+async def delete_routine(routine_id: str, current_user: UserModel = Depends(get_current_user)):
+    """Delete a routine"""
+    try:
+        deleted = await routine_service.delete_routine(current_user.user_id, routine_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Routine not found")
+            
+        logger.info("Routine deleted", routine_id=routine_id, user_id=current_user.user_id)
+        return {"message": "Routine deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to delete routine", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))

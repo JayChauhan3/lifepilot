@@ -1,18 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
     FiHome,
     FiMessageSquare,
     FiCheckSquare,
     FiPieChart,
     FiSettings,
-    FiMenu
+    FiMenu,
+    FiLogOut
 } from "react-icons/fi";
 import { motion } from "framer-motion";
 import clsx from "clsx";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { authService } from "@/services/authService";
 
 const NAV_ITEMS = [
     { name: "Dashboard", href: "/", icon: FiHome },
@@ -24,7 +26,41 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const router = useRouter();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [user, setUser] = useState<{ email: string; full_name?: string } | null>(null);
+
+    useEffect(() => {
+        // Fetch current user info
+        const fetchUser = async () => {
+            try {
+                const userData = await authService.getCurrentUser();
+                setUser(userData);
+            } catch (error) {
+                console.error('Failed to fetch user:', error);
+            }
+        };
+
+        if (authService.isAuthenticated()) {
+            fetchUser();
+        }
+    }, []);
+
+    const handleLogout = () => {
+        authService.logout();
+        router.push('/login');
+    };
+
+    // Get user initials
+    const getInitials = () => {
+        if (user?.full_name) {
+            return user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        }
+        if (user?.email) {
+            return user.email.slice(0, 2).toUpperCase();
+        }
+        return 'U';
+    };
 
     return (
         <>
@@ -96,17 +132,31 @@ export default function Sidebar() {
                         })}
                     </nav>
 
-                    {/* User Profile / Footer (Optional) */}
-                    <div className="p-4 border-t border-gray-50">
-                        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                    {/* User Profile / Footer */}
+                    <div className="p-4 border-t border-gray-50 space-y-2">
+                        {/* User Info */}
+                        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors">
                             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
-                                JC
+                                {getInitials()}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">Jay Chauhan</p>
-                                <p className="text-xs text-gray-500 truncate">Pro Plan</p>
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                    {user?.full_name || user?.email || 'Loading...'}
+                                </p>
+                                <p className="text-xs text-gray-500 truncate">
+                                    {user?.email && user?.full_name ? user.email : 'Pro Plan'}
+                                </p>
                             </div>
                         </div>
+
+                        {/* Logout Button */}
+                        <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                            <FiLogOut size={18} />
+                            Logout
+                        </button>
                     </div>
                 </div>
             </aside>

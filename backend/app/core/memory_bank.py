@@ -4,8 +4,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 import os
 import uuid
-import chromadb
-from chromadb.config import Settings
+from pinecone import Pinecone
 from .embeddings import get_embeddings
 from .context_compactor import get_compactor
 
@@ -20,11 +19,11 @@ class MemoryBank:
         self.global_memory: Dict[str, Any] = {}
         
         # Vector DB setup
-        self.vector_db_provider = os.getenv("VECTOR_DB_PROVIDER", "chroma")
+        self.vector_db_provider = os.getenv("VECTOR_DB_PROVIDER", "pinecone")
         self.embeddings = get_embeddings()
         self.compactor = get_compactor()
         self._vector_client = None
-        self._vector_collections = {}
+        self._vector_index = None
         
         # Initialize vector DB
         self._initialize_vector_db()
@@ -32,26 +31,27 @@ class MemoryBank:
     def _initialize_vector_db(self):
         """Initialize vector database client"""
         try:
-            if self.vector_db_provider == "chroma":
-                # Initialize ChromaDB
-                data_path = os.getenv("CHROMA_DATA_PATH", "./data/chroma")
-                os.makedirs(data_path, exist_ok=True)
+            if self.vector_db_provider == "pinecone":
+                # Initialize Pinecone
+                api_key = os.getenv("PINECONE_API_KEY")
+                index_name = os.getenv("PINECONE_INDEX", "lifepilot-memory")
                 
-                self._vector_client = chromadb.PersistentClient(
-                    path=data_path,
-                    settings=Settings(
-                        anonymized_telemetry=False,
-                        allow_reset=True
-                    )
-                )
-                logger.info("ChromaDB initialized", path=data_path)
+                if not api_key:
+                    logger.warning("PINECONE_API_KEY not set, running without vector DB")
+                    return
+
+                self._vector_client = Pinecone(api_key=api_key)
+                self._vector_index = self._vector_client.Index(index_name)
+                
+                logger.info("Pinecone initialized", index=index_name)
             else:
                 logger.error("Unsupported vector DB provider", provider=self.vector_db_provider)
-                raise ValueError(f"Unsupported vector DB provider: {self.vector_db_provider}")
+                # raise ValueError(f"Unsupported vector DB provider: {self.vector_db_provider}")
         except Exception as e:
             logger.error("Failed to initialize vector DB", error=str(e))
             # Continue without vector DB
             self._vector_client = None
+            self._vector_index = None
     
     def store_memory(self, user_id: str, key: str, value: Any, category: str = "general") -> bool:
         """Store a memory with category and timestamp"""
@@ -164,41 +164,31 @@ class MemoryBank:
         logger.info("Memory search completed", user_id=user_id, query=query, results_count=len(results))
         return results
     
-    def _get_collection(self, user_id: str):
-        """Get or create vector collection for user"""
-        if user_id not in self._vector_collections:
-            collection_name = f"user_{user_id.replace('-', '_')}"
-            try:
-                self._vector_collections[user_id] = self._vector_client.get_collection(collection_name)
-            except:
-                self._vector_collections[user_id] = self._vector_client.create_collection(
-                    name=collection_name,
-                    metadata={"hnsw:space": "cosine"}
-                )
-        return self._vector_collections[user_id]
-    
     def _upsert_memory_vector(self, user_id: str, key: str, value: Any, category: str):
         """Upsert memory into vector DB"""
         try:
-            collection = self._get_collection(user_id)
-            
+            if not self._vector_index:
+                return
+
             # Convert value to string for embedding
             content = str(value)
             
             # Generate embedding
             embedding = self.embeddings.embed_single(content)
             
-            # Upsert into vector DB
-            collection.upsert(
-                ids=[key],
-                embeddings=[embedding],
-                metadatas=[{
-                    "user_id": user_id,
-                    "key": key,
-                    "category": category,
-                    "created_at": datetime.now().isoformat()
-                }],
-                documents=[content]
+            # Upsert into Pinecone
+            self._vector_index.upsert(
+                vectors=[{
+                    "id": key,
+                    "values": embedding,
+                    "metadata": {
+                        "user_id": user_id,
+                        "key": key,
+                        "category": category,
+                        "created_at": datetime.now().isoformat(),
+                        "content": content # Store content in metadata for retrieval
+                    }
+                }]
             )
             
             logger.debug("Memory upserted to vector DB", user_id=user_id, key=key)
@@ -207,32 +197,31 @@ class MemoryBank:
     
     def retrieve_similar_memories(self, user_id: str, query: str, k: int = 5) -> List[Dict[str, Any]]:
         """Retrieve memories similar to query using vector search"""
-        if not self._vector_client:
+        if not self._vector_index:
             return []
         
         try:
-            collection = self._get_collection(user_id)
-            
             # Generate query embedding
             query_embedding = self.embeddings.embed_single(query)
             
-            # Search vector DB
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=k
+            # Search Pinecone
+            results = self._vector_index.query(
+                vector=query_embedding,
+                top_k=k,
+                include_metadata=True,
+                filter={"user_id": user_id}
             )
             
             # Format results
             memories = []
-            if results["ids"] and results["ids"][0]:
-                for i in range(len(results["ids"][0])):
-                    memory = {
-                        "key": results["ids"][0][i],
-                        "content": results["documents"][0][i],
-                        "metadata": results["metadatas"][0][i],
-                        "distance": results["distances"][0][i] if "distances" in results else 0
-                    }
-                    memories.append(memory)
+            for match in results.matches:
+                memory = {
+                    "key": match.id,
+                    "content": match.metadata.get("content", ""),
+                    "metadata": match.metadata,
+                    "distance": match.score if match.score else 0 # Pinecone returns similarity score
+                }
+                memories.append(memory)
             
             logger.info("Similar memories retrieved", user_id=user_id, query=query, count=len(memories))
             return memories
@@ -243,12 +232,10 @@ class MemoryBank:
     
     def upsert_document(self, user_id: str, doc_id: str, content: str, metadata: Dict[str, Any] = None):
         """Upsert a document into vector DB for RAG"""
-        if not self._vector_client:
+        if not self._vector_index:
             return False
         
         try:
-            collection = self._get_collection(f"docs_{user_id}")
-            
             # Generate embedding
             embedding = self.embeddings.embed_single(content)
             
@@ -257,17 +244,19 @@ class MemoryBank:
                 "user_id": user_id,
                 "doc_id": doc_id,
                 "type": "document",
-                "created_at": datetime.now().isoformat()
+                "created_at": datetime.now().isoformat(),
+                "content": content # Store content in metadata
             }
             if metadata:
                 doc_metadata.update(metadata)
             
             # Upsert
-            collection.upsert(
-                ids=[doc_id],
-                embeddings=[embedding],
-                metadatas=[doc_metadata],
-                documents=[content]
+            self._vector_index.upsert(
+                vectors=[{
+                    "id": doc_id,
+                    "values": embedding,
+                    "metadata": doc_metadata
+                }]
             )
             
             logger.info("Document upserted", user_id=user_id, doc_id=doc_id)
@@ -294,22 +283,23 @@ class MemoryBank:
         
         # Get relevant documents if available
         try:
-            doc_collection = self._get_collection(f"docs_{user_id}")
-            query_embedding = self.embeddings.embed_single(query)
-            
-            doc_results = doc_collection.query(
-                query_embeddings=[query_embedding],
-                n_results=k
-            )
-            
-            if doc_results["ids"] and doc_results["ids"][0]:
-                for i in range(len(doc_results["ids"][0])):
+            if self._vector_index:
+                query_embedding = self.embeddings.embed_single(query)
+                
+                doc_results = self._vector_index.query(
+                    vector=query_embedding,
+                    top_k=k,
+                    include_metadata=True,
+                    filter={"user_id": user_id, "type": "document"}
+                )
+                
+                for match in doc_results.matches:
                     contexts.append({
-                        "content": doc_results["documents"][0][i],
-                        "source": f"document:{doc_results['ids'][0][i]}",
+                        "content": match.metadata.get("content", ""),
+                        "source": f"document:{match.id}",
                         "type": "document",
-                        "score": 1 - doc_results["distances"][0][i] if "distances" in doc_results else 0,
-                        "metadata": doc_results["metadatas"][0][i]
+                        "score": match.score if match.score else 0,
+                        "metadata": match.metadata
                     })
         except:
             pass  # No documents found

@@ -13,20 +13,37 @@ FastAPI-based backend for the LifePilot AI assistant application.
 
 ## Architecture
 
+LifePilot Backend
+|
+|-- MongoDB (Atlas)
+|     - tasks, routines, users
+|
+|-- Pinecone (Serverless)
+|     - vector memory (768D)
+|
+|-- Gemini Flash Lite (LLM)
+|     - planning agent
+|
+|-- Gemini text-embedding-004
+|     - embeddings
+
+### System Flow
+
 ```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Frontend  │───▶│   Router    │───▶│   Planner   │
-└─────────────┘    └─────────────┘    └─────────────┘
-                           │                   │
-                           ▼                   ▼
-                   ┌─────────────┐    ┌─────────────┐
-                   │   Memory    │    │  Knowledge  │
-                   └─────────────┘    └─────────────┘
-                           │                   │
-                           ▼                   ▼
-                   ┌─────────────┐    ┌─────────────┐
-                   │  Executor   │    │  Analyzer   │
-                   └─────────────┘    └─────────────┘
+┌─────────────┐    ┌─────────────┐
+│   Frontend  │───▶│   Router    │
+└─────────────┘    └─────────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+  │   Planner   │ │   Memory    │ │  Executor   │
+  └─────────────┘ └─────────────┘ └─────────────┘
+          │               │               │
+          ▼               ▼               ▼
+  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+  │   MongoDB   │ │  Pinecone   │ │    Tools    │
+  └─────────────┘ └─────────────┘ └─────────────┘
 ```
 
 ## Core Components

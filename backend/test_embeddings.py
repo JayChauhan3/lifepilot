@@ -247,8 +247,8 @@ async def main():
     
     # Set environment for testing
     os.environ["EMBEDDING_PROVIDER"] = "sentence-transformers"
-    os.environ["VECTOR_DB_PROVIDER"] = "chroma"
-    os.environ["CHROMA_DATA_PATH"] = "/tmp/test_chroma"
+    # Test Pinecone (mocked)
+    os.environ["VECTOR_DB_PROVIDER"] = "pinecone"
     os.environ["LLM_PROVIDER"] = "mock"
     
     try:

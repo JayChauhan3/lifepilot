@@ -1,6 +1,9 @@
 # FastAPI startup
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -8,8 +11,23 @@ load_dotenv()
 
 import structlog
 from app.api.chat import router as chat_router
+from app.api.tasks import router as tasks_router
+from app.api.routines import router as routines_router
+from app.api.users import router as users_router
+from app.api.auth import router as auth_router
 from app.core.orchestrator import orchestrator
 from app.core.websocket_manager import notification_manager
+from app.core.database import connect_to_mongo, close_mongo_connection
+from app.middleware import (
+    global_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+    logging_middleware,
+    limiter,
+)
+from app.config import settings
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 
 logger = structlog.get_logger()
 
@@ -18,6 +36,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan management"""
     # Startup
     logger.info("Starting LifePilot API application")
+    await connect_to_mongo()
     await orchestrator.start()
     
     yield
@@ -25,6 +44,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down LifePilot API application")
     await orchestrator.stop()
+    await close_mongo_connection()
 
 # Create FastAPI app
 app = FastAPI(
@@ -34,17 +54,40 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
+# Add rate limiter
+app.state.limiter = limiter
+
+# Configure CORS with specific origins
+allowed_origins = settings.CORS_ORIGINS.split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Add session middleware for OAuth
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.JWT_SECRET_KEY  # Use JWT secret for session
+)
+
+# Add custom middleware
+app.middleware("http")(logging_middleware)
+
+# Add exception handlers
+app.add_exception_handler(Exception, global_exception_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Include routers
+app.include_router(auth_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+app.include_router(tasks_router, prefix="/api")
+app.include_router(routines_router, prefix="/api")
+app.include_router(users_router, prefix="/api")
 
 @app.get("/")
 async def root():
