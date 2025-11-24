@@ -32,20 +32,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const tasks = await plannerService.getTasks();
-            // Initialize with some dummy data if empty for demo purposes, matching the user request
-            if (tasks.length === 0) {
-                const dummyTasks: Task[] = [
-                    { id: '1', title: "Review Q3 Marketing Plan", tags: ["Work"], aim: "Review the Q3 plan", date: new Date().toISOString().split('T')[0], time: "09:00", isCompleted: false, type: 'today' },
-                    { id: '2', title: "Call with Design Team", tags: ["Meeting"], aim: "Discuss new designs", date: new Date().toISOString().split('T')[0], time: "14:00", isCompleted: false, type: 'today' },
-                    { id: '3', title: "Buy Groceries", tags: ["Personal"], aim: "Milk, eggs, bread", date: new Date().toISOString().split('T')[0], time: "17:30", isCompleted: false, type: 'today' },
-                    { id: '4', title: "Update Website Copy", tags: ["Project"], aim: "Update homepage copy", date: "2025-11-24", time: "10:00", isCompleted: false, type: 'upcoming' },
-                    { id: '5', title: "Prepare Monthly Report", tags: ["Admin"], aim: "Compile stats", date: "2025-11-25", time: "11:00", isCompleted: false, type: 'upcoming' },
-                    { id: '6', title: "Morning Standup", tags: ["Meeting"], aim: "Daily sync", date: new Date().toISOString().split('T')[0], time: "09:00", isCompleted: true, type: 'done' },
-                ];
-                set({ tasks: dummyTasks, isLoading: false });
-            } else {
-                set({ tasks, isLoading: false });
-            }
+            set({ tasks, isLoading: false });
         } catch (error) {
             set({ error: 'Failed to fetch tasks', isLoading: false });
         }
@@ -108,6 +95,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         const task = get().tasks.find((t) => t.id === id);
         if (!task) return;
 
+        console.log('Toggling completion for task:', id, 'Current status:', task.isCompleted);
         const newIsCompleted = !task.isCompleted;
         const newType = newIsCompleted ? 'done' : (task.date === new Date().toISOString().split('T')[0] ? 'today' : 'upcoming');
 
@@ -118,36 +106,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const routines = await plannerService.getRoutines();
-            let finalRoutines = routines;
-
-            // Initialize with some dummy data if empty for demo purposes
-            if (routines.length === 0) {
-                finalRoutines = [
-                    { id: '1', title: "Morning Routine", startTime: "08:00", duration: "45m", nextRun: "Tomorrow, 8:00 AM", icon: "FiSun" },
-                    { id: '2', title: "Deep Work Block", startTime: "09:00", duration: "8h", nextRun: "Tomorrow, 9:00 AM", icon: "FiBriefcase" }, // Changed to 8h for demo
-                    { id: '3', title: "Gym Workout", startTime: "17:30", duration: "1h", nextRun: "Today, 5:30 PM", icon: "FiActivity" },
-                    { id: '4', title: "Evening Wind Down", startTime: "21:30", duration: "30m", nextRun: "Today, 9:30 PM", icon: "FiMoon" },
-                    { id: '5', title: "Reading Time", startTime: "22:00", duration: "30m", nextRun: "Today, 10:00 PM", icon: "FiBook" },
-                ];
-            }
-
-            // Ensure "Work" routine exists
-            const hasWorkRoutine = finalRoutines.some(r => r.title.toLowerCase().includes('work'));
-            if (!hasWorkRoutine) {
-                const workRoutine: Routine = {
-                    id: 'work-routine-default',
-                    title: "Work Block",
-                    startTime: "09:00",
-                    duration: "8h",
-                    nextRun: "Tomorrow, 9:00 AM",
-                    icon: "FiBriefcase"
-                };
-                finalRoutines = [...finalRoutines, workRoutine];
-                // In real app, we should persist this creation
-                // await plannerService.createRoutine(workRoutine); 
-            }
-
-            set({ routines: finalRoutines, isLoading: false });
+            set({ routines, isLoading: false });
         } catch (error) {
             set({ error: 'Failed to fetch routines', isLoading: false });
         }
@@ -178,21 +137,16 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
     deleteRoutine: async (id) => {
         set({ isLoading: true, error: null });
+        console.log('Deleting routine:', id);
         try {
-            const routineToDelete = get().routines.find(r => r.id === id);
-            if (routineToDelete && routineToDelete.title.toLowerCase().includes('work')) {
-                // Prevent deleting work routine
-                // We could throw an error or just return, but let's set error state to notify UI if needed
-                set({ error: 'Cannot delete the mandatory Work routine', isLoading: false });
-                return;
-            }
-
             await plannerService.deleteRoutine(id);
+            console.log('Routine deleted successfully from API');
             set((state) => ({
                 routines: state.routines.filter((r) => r.id !== id),
                 isLoading: false,
             }));
         } catch (error) {
+            console.error('Failed to delete routine:', error);
             set({ error: 'Failed to delete routine', isLoading: false });
         }
     },

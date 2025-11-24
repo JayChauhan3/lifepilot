@@ -103,10 +103,22 @@ export const plannerService = {
     },
 
     async createRoutine(routine: Omit<Routine, 'id'>): Promise<Routine> {
+        // Transform frontend format to backend format
+        const backendRoutine = {
+            title: routine.title,
+            time_of_day: routine.startTime,
+            duration: routine.duration,
+            icon: routine.icon || 'FiActivity',
+            is_work_block: routine.isWorkBlock || false,
+            frequency: 'daily', // Default to daily
+            days_of_week: [],
+            is_active: true,
+        };
+
         const response = await fetch(`${API_BASE_URL}/routines`, {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify(routine),
+            body: JSON.stringify(backendRoutine),
         });
 
         if (!response.ok) {
@@ -121,10 +133,19 @@ export const plannerService = {
     },
 
     async updateRoutine(id: string, updates: Partial<Routine>): Promise<Routine> {
+        // Transform frontend format to backend format
+        const backendUpdates: any = {};
+
+        if (updates.title !== undefined) backendUpdates.title = updates.title;
+        if (updates.startTime !== undefined) backendUpdates.time_of_day = updates.startTime;
+        if (updates.duration !== undefined) backendUpdates.duration = updates.duration;
+        if (updates.icon !== undefined) backendUpdates.icon = updates.icon;
+        if (updates.isWorkBlock !== undefined) backendUpdates.is_work_block = updates.isWorkBlock;
+
         const response = await fetch(`${API_BASE_URL}/routines/${id}`, {
             method: 'PUT',
             headers: getHeaders(),
-            body: JSON.stringify(updates),
+            body: JSON.stringify(backendUpdates),
         });
 
         if (!response.ok) {

@@ -18,4 +18,5 @@ export interface Routine {
     duration: string; // e.g. "45m" or "2h"
     nextRun: string; // calculated string
     icon?: string; // Optional icon name or identifier
+    isWorkBlock?: boolean; // Identifies work block routines
 }

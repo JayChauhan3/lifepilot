@@ -82,7 +82,7 @@ export default function TodayPlan() {
 
     const timelineItems = useMemo(() => {
         const todayTasks = tasks.filter(t => t.type === 'today' && !t.isCompleted);
-        const workRoutine = routines.find(r => r.title.toLowerCase().includes('work'));
+        const workRoutine = routines.find(r => r.isWorkBlock || r.title.toLowerCase().includes('work'));
 
         // 1. Identify Work Tasks (no time set, or explicitly tagged 'Work')
         // For simplicity, we'll assume tasks without a specific time (or default 00:00/empty) go to work block
@@ -99,9 +99,9 @@ export default function TodayPlan() {
         let workDurationMins = 8 * 60; // Default 8h
 
         if (workRoutine) {
-            workStartTime = workRoutine.startTime;
+            workStartTime = workRoutine.startTime || "09:00";
             // Parse duration (e.g., "8h", "45m")
-            const dur = workRoutine.duration.toLowerCase();
+            const dur = (workRoutine.duration || "8h").toLowerCase();
             if (dur.includes('h')) workDurationMins = parseFloat(dur) * 60;
             else if (dur.includes('m')) workDurationMins = parseFloat(dur);
         }
@@ -117,7 +117,7 @@ export default function TodayPlan() {
         routines.forEach(routine => {
             let type = 'routine';
             const lowerTitle = routine.title.toLowerCase();
-            if (lowerTitle.includes('work')) type = 'work';
+            if (routine.isWorkBlock || lowerTitle.includes('work')) type = 'work';
             else if (lowerTitle.includes('gym') || lowerTitle.includes('health')) type = 'health';
 
             const Icon = ICON_MAP[routine.icon || 'FiActivity'] || FiActivity;

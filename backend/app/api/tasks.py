@@ -17,6 +17,12 @@ class TaskCreate(BaseModel):
     priority: str = "medium"
     due_date: Optional[str] = None
     tags: List[str] = []
+    
+    # Frontend compatibility fields
+    aim: Optional[str] = None
+    date: Optional[str] = None
+    time: Optional[str] = None
+    type: Optional[str] = "upcoming"
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
@@ -26,6 +32,12 @@ class TaskUpdate(BaseModel):
     due_date: Optional[str] = None
     tags: Optional[List[str]] = None
     is_completed: Optional[bool] = None
+    
+    # Frontend compatibility fields
+    aim: Optional[str] = None
+    date: Optional[str] = None
+    time: Optional[str] = None
+    type: Optional[str] = None
 
 @router.post("/tasks", response_model=TaskModel)
 async def create_task(task: TaskCreate, current_user: UserModel = Depends(get_current_user)):
@@ -98,9 +110,11 @@ async def update_task(
 @router.delete("/tasks/{task_id}")
 async def delete_task(task_id: str, current_user: UserModel = Depends(get_current_user)):
     """Delete a task"""
+    logger.info("Received delete request for task", task_id=task_id, user_id=current_user.user_id)
     try:
         deleted = await task_service.delete_task(current_user.user_id, task_id)
         if not deleted:
+            logger.warning("Task not found for deletion", task_id=task_id)
             raise HTTPException(status_code=404, detail="Task not found")
             
         logger.info("Task deleted", task_id=task_id, user_id=current_user.user_id)

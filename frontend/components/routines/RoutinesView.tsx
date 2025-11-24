@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiPlay, FiEdit2, FiClock, FiRepeat, FiSun, FiMoon, FiBriefcase, FiActivity, FiBook, FiPlus } from "react-icons/fi";
+import { FiPlay, FiEdit2, FiClock, FiRepeat, FiSun, FiMoon, FiBriefcase, FiActivity, FiBook, FiPlus, FiTrash2, FiCoffee, FiShoppingBag } from "react-icons/fi";
 import clsx from "clsx";
 import { usePlannerStore } from "../../store/plannerStore";
 import { Routine } from "../../types/planner";
@@ -120,6 +120,7 @@ export default function RoutinesView() {
                         routine={routine}
                         index={index}
                         onEdit={() => handleEditRoutine(routine)}
+                        onDelete={() => handleDeleteRoutine(routine.id)}
                     />
                 ))}
             </AnimatePresence>
@@ -160,7 +161,7 @@ export default function RoutinesView() {
     );
 }
 
-function RoutineCard({ routine, index, onEdit }: { routine: Routine, index: number, onEdit: () => void }) {
+function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, index: number, onEdit: () => void, onDelete: (id: string) => void }) {
     const Icon = ICON_MAP[routine.icon || 'FiActivity'] || FiActivity;
 
     // Determine style based on title keywords or default
@@ -205,6 +206,14 @@ function RoutineCard({ routine, index, onEdit }: { routine: Routine, index: numb
                         >
                             <FiEdit2 size={16} />
                         </button>
+                        {!routine.isWorkBlock && (
+                            <button
+                                onClick={() => onDelete(routine.id)}
+                                className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                                <FiTrash2 size={16} />
+                            </button>
+                        )}
                     </div>
                 </div>
 

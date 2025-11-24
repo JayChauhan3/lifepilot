@@ -17,6 +17,11 @@ class RoutineCreate(BaseModel):
     time_of_day: Optional[str] = None
     days_of_week: List[str] = []
     is_active: bool = True
+    
+    # Display fields
+    icon: Optional[str] = None  # Icon identifier (e.g., "FiSun", "FiBriefcase")
+    duration: Optional[str] = None  # Display duration (e.g., "45m", "2h", "8h")
+    is_work_block: bool = False  # Identifies work block routines
 
 class RoutineUpdate(BaseModel):
     title: Optional[str] = None
@@ -25,6 +30,11 @@ class RoutineUpdate(BaseModel):
     time_of_day: Optional[str] = None
     days_of_week: Optional[List[str]] = None
     is_active: Optional[bool] = None
+    
+    # Display fields
+    icon: Optional[str] = None
+    duration: Optional[str] = None
+    is_work_block: Optional[bool] = None
 
 @router.post("/routines", response_model=RoutineModel)
 async def create_routine(routine: RoutineCreate, current_user: UserModel = Depends(get_current_user)):
@@ -73,9 +83,11 @@ async def update_routine(
 @router.delete("/routines/{routine_id}")
 async def delete_routine(routine_id: str, current_user: UserModel = Depends(get_current_user)):
     """Delete a routine"""
+    logger.info("Received delete request for routine", routine_id=routine_id, user_id=current_user.user_id)
     try:
         deleted = await routine_service.delete_routine(current_user.user_id, routine_id)
         if not deleted:
+            logger.warning("Routine not found for deletion", routine_id=routine_id)
             raise HTTPException(status_code=404, detail="Routine not found")
             
         logger.info("Routine deleted", routine_id=routine_id, user_id=current_user.user_id)

@@ -208,9 +208,12 @@ function TaskCard({ task, index, isDone, onClick, onDelete, onCheckboxClick }: T
                     {/* Checkbox logic: Only for Today tasks or Done tasks */}
                     {(task.type === 'today' || isDone) && (
                         <button
-                            onClick={onCheckboxClick}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onCheckboxClick(e);
+                            }}
                             className={clsx(
-                                "mt-0.5 shrink-0 transition-colors",
+                                "mt-0.5 shrink-0 transition-colors relative z-10",
                                 isDone ? "text-green-500" : "text-gray-300 hover:text-primary-500"
                             )}
                         >
@@ -226,16 +229,14 @@ function TaskCard({ task, index, isDone, onClick, onDelete, onCheckboxClick }: T
                     </h4>
                 </div>
 
-                {/* Delete Icon - replaces colored dot */}
-                {!isDone && (
-                    <button
-                        onClick={onDelete}
-                        className="text-gray-300 hover:text-red-500 transition-colors p-1 -mr-1 opacity-0 group-hover:opacity-100"
-                        title="Delete Task"
-                    >
-                        <FiTrash2 size={14} />
-                    </button>
-                )}
+                {/* Delete Icon */}
+                <button
+                    onClick={onDelete}
+                    className="text-gray-300 hover:text-red-500 transition-colors p-1 -mr-1 opacity-0 group-hover:opacity-100"
+                    title="Delete Task"
+                >
+                    <FiTrash2 size={14} />
+                </button>
             </div>
 
             <div className="flex items-center justify-between mt-3 pl-7">

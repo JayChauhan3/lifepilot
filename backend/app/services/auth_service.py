@@ -79,69 +79,33 @@ class AuthService:
         Raises:
             ValueError: If email already exists
         """
-        # Check if user exists in main collection
+        # Directly create an active, verified user for development
         existing_user = await self.get_user_by_email(email)
         if existing_user:
             raise ValueError("Email already registered")
-            
-        # Check if user exists in pending collection
-        pending_user = await self.pending_collection.find_one({"email": email})
         
-        # Generate verification code
-        verification_code = secrets.token_hex(3).upper()  # 6 chars
-        expires_at = datetime.utcnow() + timedelta(minutes=15)
+        # Hash password and create user record
         password_hash = self.hash_password(password)
-        
-        # Mock email sending
-        verification_link = f"http://localhost:3000/auth/verify?email={email}&code={verification_code}"
-        
-        if pending_user:
-            # User exists in pending - resend verification
-            email_service.send_verification_email(email, verification_link)
-            
-            await self.pending_collection.update_one(
-                {"email": email},
-                {
-                    "$set": {
-                        "password_hash": password_hash,
-                        "full_name": full_name or pending_user.get("full_name"),
-                        "verification_token": verification_code,
-                        "verification_token_expires_at": expires_at
-                    }
-                }
-            )
-            # Return a temporary UserModel for the response, but it's not in the main DB yet
-            return UserModel(
-                user_id=pending_user["user_id"],
-                email=email,
-                full_name=full_name or pending_user.get("full_name"),
-                is_active=False,
-                is_verified=False
-            )
-        
-        # Create new pending user
         user_id = str(uuid.uuid4())
-        email_service.send_verification_email(email, verification_link)
-        
-        pending_user_dict = {
+        user_dict = {
             "user_id": user_id,
             "email": email,
             "full_name": full_name,
             "password_hash": password_hash,
-            "verification_token": verification_code,
-            "verification_token_expires_at": expires_at,
-            "created_at": datetime.utcnow()
+            "is_active": True,
+            "is_verified": True,
+            "created_at": datetime.utcnow(),
         }
-        
-        await self.pending_collection.insert_one(pending_user_dict)
-        logger.info("Pending user registered", email=email, user_id=user_id)
+        # Insert into main collection
+        await self.collection.insert_one(user_dict)
+        logger.info("Dev user created and activated", email=email, user_id=user_id)
         
         return UserModel(
             user_id=user_id,
             email=email,
             full_name=full_name,
-            is_active=False,
-            is_verified=False
+            is_active=True,
+            is_verified=True,
         )
 
     async def verify_email(self, email: str, code: str) -> bool:
