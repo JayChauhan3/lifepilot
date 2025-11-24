@@ -1,24 +1,39 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/services/authService';
 
 export default function LoginPage() {
     const router = useRouter();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const searchParams = useSearchParams();
+    const [formData, setFormData] = useState({
+        email: '',
+        password: '',
+    });
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (searchParams.get('verified') === 'true') {
+            setSuccess('Successfully verified and account created.');
+        }
+    }, [searchParams]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setSuccess(''); // Clear success message on new login attempt
         setLoading(true);
 
         try {
-            await authService.login({ email, password });
+            await authService.login(formData);
             router.push('/');
         } catch (err: any) {
             setError(err.message || 'Login failed');
@@ -49,6 +64,13 @@ export default function LoginPage() {
                         </div>
                     )}
 
+                    {/* Success Message */}
+                    {success && (
+                        <div className="mb-6 p-4 bg-green-500/20 border border-green-500/50 rounded-lg text-green-200 text-sm">
+                            {success}
+                        </div>
+                    )}
+
                     {/* Login Form */}
                     <form onSubmit={handleLogin} className="space-y-5">
                         {/* Email */}
@@ -58,8 +80,9 @@ export default function LoginPage() {
                             </label>
                             <input
                                 type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                name="email"
+                                value={formData.email}
+                                onChange={handleChange}
                                 required
                                 autoComplete="email"
                                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
@@ -74,8 +97,9 @@ export default function LoginPage() {
                             </label>
                             <input
                                 type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                name="password"
+                                value={formData.password}
+                                onChange={handleChange}
                                 required
                                 autoComplete="current-password"
                                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"

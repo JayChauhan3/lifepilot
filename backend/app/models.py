@@ -60,6 +60,8 @@ class UserModel(MongoBaseModel):
     # User status
     is_active: bool = True
     is_verified: bool = False
+    verification_token: Optional[str] = None
+    verification_token_expires_at: Optional[datetime] = None
     
     # Preferences
     preferences: dict = {}

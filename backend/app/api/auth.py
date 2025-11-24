@@ -8,6 +8,7 @@ from app.services.auth_service import AuthService
 from app.services.oauth_service import OAuthService, oauth
 from app.core.jwt_utils import create_access_token, verify_token
 from app.models import UserModel
+from app.core.security import validate_password, validate_email
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -27,6 +28,10 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class UserVerify(BaseModel):
+    email: EmailStr
+    code: str
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -42,6 +47,16 @@ class UserResponse(BaseModel):
 async def register(user_data: UserRegister):
     """Register a new user"""
     try:
+        # Validate email format
+        email_error = validate_email(user_data.email)
+        if email_error:
+            raise ValueError(email_error)
+
+        # Validate password strength
+        password_error = validate_password(user_data.password)
+        if password_error:
+            raise ValueError(password_error)
+
         user = await auth_service.register_user(
             email=user_data.email,
             password=user_data.password,
@@ -55,7 +70,7 @@ async def register(user_data: UserRegister):
             email=user.email,
             full_name=user.full_name,
             is_active=user.is_active,
-            is_verified=user.is_verified
+            is_verified=False  # Always false initially
         )
         
     except ValueError as e:
@@ -95,6 +110,30 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Login failed"
+        )
+
+@router.post("/auth/verify", response_model=Token)
+async def verify_email(verify_data: UserVerify):
+    """Verify email address"""
+    try:
+        await auth_service.verify_email(verify_data.email, verify_data.code)
+        
+        # Get user to create token
+        user = await auth_service.get_user_by_email(verify_data.email)
+        access_token = create_access_token(data={"sub": user.user_id})
+        
+        return Token(access_token=access_token, token_type="bearer")
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error("Verification failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Verification failed"
         )
 
 @router.get("/auth/me", response_model=UserResponse)

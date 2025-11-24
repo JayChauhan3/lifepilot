@@ -107,6 +107,25 @@ class AuthService {
     }
 
     // Get current user
+    async verifyEmail(email: string, code: string): Promise<AuthResponse> {
+        const response = await fetch(`${API_BASE_URL}/auth/verify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, code }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Verification failed');
+        }
+
+        const data = await response.json();
+        this.setToken(data.access_token);
+        return data;
+    }
+
     async getCurrentUser(): Promise<User> {
         const token = this.getToken();
         if (!token) {

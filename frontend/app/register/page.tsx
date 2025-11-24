@@ -14,6 +14,7 @@ export default function RegisterPage() {
         full_name: '',
     });
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,13 +49,11 @@ export default function RegisterPage() {
                 full_name: formData.full_name || undefined,
             });
 
-            // Auto-login after registration
-            await authService.login({
-                email: formData.email,
-                password: formData.password,
-            });
-
-            router.push('/');
+            // Registration successful
+            setSuccess('Please check your email to verify your account.');
+            setTimeout(() => {
+                router.push('/login');
+            }, 5000); // Give them time to read the message
         } catch (err: any) {
             setError(err.message || 'Registration failed');
         } finally {
@@ -81,6 +80,13 @@ export default function RegisterPage() {
                     {error && (
                         <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
                             {error}
+                        </div>
+                    )}
+
+                    {/* Success Message */}
+                    {success && (
+                        <div className="mb-6 p-4 bg-green-500/20 border border-green-500/50 rounded-lg text-green-200 text-sm">
+                            {success}
                         </div>
                     )}
 
