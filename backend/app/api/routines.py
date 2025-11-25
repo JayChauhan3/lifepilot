@@ -43,6 +43,10 @@ async def create_routine(routine: RoutineCreate, current_user: UserModel = Depen
         created_routine = await routine_service.create_routine(current_user.user_id, routine.model_dump())
         logger.info("Routine created", routine_id=str(created_routine.id), user_id=current_user.user_id)
         return created_routine
+    except ValueError as e:
+        # Time conflict error
+        logger.warning("Routine creation failed - time conflict", error=str(e), user_id=current_user.user_id)
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         logger.error("Failed to create routine", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -74,10 +78,40 @@ async def update_routine(
             
         logger.info("Routine updated", routine_id=routine_id, user_id=current_user.user_id)
         return updated_routine
+    except ValueError as e:
+        # Time conflict error
+        logger.warning("Routine update failed - time conflict", error=str(e), user_id=current_user.user_id)
+        raise HTTPException(status_code=409, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
         logger.error("Failed to update routine", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/routines/check-conflicts", response_model=List[RoutineModel])
+async def check_time_conflicts(
+    start_time: str = Query(..., description="Start time in HH:MM format"),
+    end_time: str = Query(..., description="End time in HH:MM format"),
+    exclude_id: Optional[str] = Query(None, description="Routine ID to exclude from conflict check"),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Check for time conflicts with existing routines"""
+    try:
+        # Convert times to 24h format if needed
+        from app.models import _to_24h
+        start_24h = _to_24h(start_time)
+        end_24h = _to_24h(end_time)
+        
+        conflicts = await routine_service.find_time_conflicts(
+            current_user.user_id,
+            start_24h,
+            end_24h,
+            exclude_id=exclude_id
+        )
+        logger.info("Conflict check completed", conflicts_found=len(conflicts), user_id=current_user.user_id)
+        return conflicts
+    except Exception as e:
+        logger.error("Failed to check conflicts", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/routines/{routine_id}")

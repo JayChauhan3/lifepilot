@@ -210,23 +210,27 @@ export default function TodayPlan() {
                                 </div>
 
                                 {/* Content */}
-                                <div className="flex-1 -mt-1 pb-1">
+                                <div className="flex-1 pb-1">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-xs font-medium text-gray-400 font-mono">
-                                            {item.time}
-                                        </span>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-900 group-hover:text-primary-600 transition-colors">
+                                                {item.title}
+                                            </h3>
+                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                <FiClock className="text-gray-400" size={12} />
+                                                <span className="text-xs text-gray-500">
+                                                    {item.time}
+                                                </span>
+                                            </div>
+                                        </div>
                                         <span className={clsx(
-                                            "text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wide",
+                                            "text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wide self-start mt-0.5",
                                             styles.labelBg,
                                             styles.labelText
                                         )}>
                                             {item.type}
                                         </span>
                                     </div>
-
-                                    <h3 className="text-sm font-medium text-gray-900 mt-0.5 group-hover:text-primary-600 transition-colors">
-                                        {item.title}
-                                    </h3>
 
                                     {/* Work Block Subtasks */}
                                     {item.isWorkBlock && item.subTasks && item.subTasks.length > 0 && (

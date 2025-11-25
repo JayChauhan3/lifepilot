@@ -116,9 +116,11 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const newRoutine = await plannerService.createRoutine(routine);
-            set((state) => ({ routines: [...state.routines, newRoutine], isLoading: false }));
-        } catch (error) {
-            set({ error: 'Failed to add routine', isLoading: false });
+            await get().fetchRoutines(); // Refetch for correct order
+        } catch (error: any) {
+            const message = error.message || 'Failed to add routine';
+            set({ error: message, isLoading: false });
+            throw error; // Re-throw so modal can show error
         }
     },
 
@@ -126,12 +128,12 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             await plannerService.updateRoutine(id, updatedFields);
-            set((state) => ({
-                routines: state.routines.map((r) => (r.id === id ? { ...r, ...updatedFields } : r)),
-                isLoading: false,
-            }));
-        } catch (error) {
-            set({ error: 'Failed to update routine', isLoading: false });
+            // Refetch all routines to get the correct order from backend
+            await get().fetchRoutines();
+        } catch (error: any) {
+            const message = error.message || 'Failed to update routine';
+            set({ error: message, isLoading: false });
+            throw error; // Re-throw so modal can show error
         }
     },
 

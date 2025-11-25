@@ -110,7 +110,7 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                         type="text"
                                         value={title}
                                         onChange={(e) => setTitle(e.target.value)}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all"
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900"
                                         placeholder="What needs to be done?"
                                         required
                                     />
@@ -144,12 +144,12 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
 
                                 {/* Aim */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Aim / Description</label>
+                                    <label className="block text-sm font-medium text-black mb-1">Aim / Description</label>
                                     <textarea
                                         value={aim}
                                         onChange={(e) => setAim(e.target.value)}
                                         rows={3}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all resize-none"
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all resize-none text-black"
                                         placeholder="Describe the goal of this task..."
                                     />
                                 </div>
@@ -170,7 +170,9 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                                 readOnly={type === 'today'}
                                                 className={clsx(
                                                     "w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 outline-none transition-all",
-                                                    type === 'today' ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "focus:border-primary-500 focus:ring-2 focus:ring-primary-200"
+                                                    type === 'today' 
+                                                        ? "bg-gray-50 text-gray-500 cursor-not-allowed" 
+                                                        : "focus:border-primary-500 focus:ring-2 focus:ring-primary-200 text-gray-900"
                                                 )}
                                             />
                                         </div>
@@ -183,7 +185,7 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                                 type="time"
                                                 value={time}
                                                 onChange={(e) => setTime(e.target.value)}
-                                                className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all"
+                                                className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900"
                                             />
                                         </div>
                                     </div>

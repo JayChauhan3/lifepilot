@@ -9,6 +9,22 @@ import { Routine } from "../../types/planner";
 import RoutineModal from "../planner/RoutineModal";
 import ConfirmationModal from "../planner/ConfirmationModal";
 
+// Convert 24h time string to 12h format (e.g., '13:30' -> '1:30 PM')
+const to12Hour = (time24: string): string => {
+  if (!time24) return '';
+  
+  // If already in 12h format, return as is
+  if (time24.includes('AM') || time24.includes('PM')) {
+    return time24;
+  }
+  
+  const [hours, minutes] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+};
+
 // Helper to map icon string to component
 const ICON_MAP: Record<string, any> = {
     FiSun, FiMoon, FiBriefcase, FiActivity, FiBook
@@ -111,26 +127,47 @@ export default function RoutinesView() {
         });
     };
 
+    // Helper function to convert time string to minutes for sorting
+    const timeToMinutes = (timeStr: string | undefined): number => {
+        if (!timeStr) return 0; // Default to midnight if no time
+
+        // Handle 12-hour format with AM/PM
+        if (timeStr.includes('AM') || timeStr.includes('PM')) {
+            const [time, period] = timeStr.split(' ');
+            let [hours, minutes] = time.split(':').map(Number);
+            
+            if (period === 'PM' && hours !== 12) {
+                hours += 12;
+            } else if (period === 'AM' && hours === 12) {
+                hours = 0;
+            }
+            
+            return hours * 60 + (minutes || 0);
+        }
+        
+        // Handle 24-hour format
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return hours * 60 + (minutes || 0);
+    };
+
+    // Sort routines by start time (morning first, sleep last)
+    const sortedRoutines = [...routines].sort((a, b) => {
+        const aTime = timeToMinutes(a.startTime);
+        const bTime = timeToMinutes(b.startTime);
+        return aTime - bTime;
+    });
+    
+    // Add layoutId for smooth animations when reordering
+    const getRoutineLayoutId = (id: string) => `routine-${id}`;
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <AnimatePresence mode="popLayout">
-                {routines.map((routine, index) => (
-                    <RoutineCard
-                        key={routine.id}
-                        routine={routine}
-                        index={index}
-                        onEdit={() => handleEditRoutine(routine)}
-                        onDelete={() => handleDeleteRoutine(routine.id)}
-                    />
-                ))}
-            </AnimatePresence>
-
-            {/* Add New Routine Card */}
+            {/* Add New Routine Card - FIRST */}
             <motion.button
                 layout
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3 }}
+                transition={{ delay: 0 }}
                 onClick={handleAddRoutine}
                 className="flex flex-col items-center justify-center h-full min-h-[200px] rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/50 text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50/30 transition-all group"
             >
@@ -139,6 +176,28 @@ export default function RoutinesView() {
                 </div>
                 <span className="font-medium">Create New Routine</span>
             </motion.button>
+
+            {/* Routine Cards - Sorted from Morning to Night */}
+            <AnimatePresence mode="popLayout">
+                {sortedRoutines.map((routine) => (
+                    <motion.div
+                        key={routine.id}
+                        layoutId={getRoutineLayoutId(routine.id)}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 50 }}
+                        className="h-full"
+                    >
+                        <RoutineCard
+                            routine={routine}
+                            index={sortedRoutines.findIndex(r => r.id === routine.id) + 1}
+                            onEdit={() => handleEditRoutine(routine)}
+                            onDelete={() => handleDeleteRoutine(routine.id)}
+                        />
+                    </motion.div>
+                ))}
+            </AnimatePresence>
 
             <RoutineModal
                 isOpen={isModalOpen}
@@ -162,6 +221,17 @@ export default function RoutinesView() {
 }
 
 function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, index: number, onEdit: () => void, onDelete: (id: string) => void }) {
+    // Default times based on routine title
+    const getDefaultTimes = (title: string) => {
+        const lowerTitle = title.toLowerCase();
+        if (lowerTitle.includes('morning')) return { start: '6:00 AM', end: '10:00 AM', duration: '4h' };
+        if (lowerTitle.includes('work')) return { start: '10:00 AM', end: '5:00 PM', duration: '7h' };
+        if (lowerTitle.includes('evening')) return { start: '5:00 PM', end: '10:00 PM', duration: '5h' };
+        if (lowerTitle.includes('sleep')) return { start: '10:00 PM', end: '6:00 AM', duration: '8h' };
+        return { start: '--:--', end: '--:--', duration: '0h' };
+    };
+    
+    const defaultTimes = getDefaultTimes(routine.title);
     const Icon = ICON_MAP[routine.icon || 'FiActivity'] || FiActivity;
 
     // Determine style based on title keywords or default
@@ -206,7 +276,7 @@ function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, i
                         >
                             <FiEdit2 size={16} />
                         </button>
-                        {!routine.isWorkBlock && (
+                        {!routine.isWorkBlock && !routine.title.toLowerCase().includes('work') && (
                             <button
                                 onClick={() => onDelete(routine.id)}
                                 className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
@@ -222,18 +292,17 @@ function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, i
                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-6">
                     <div className="flex items-center gap-1.5">
                         <FiClock size={14} />
-                        <span>{routine.startTime}</span>
+                        <span>
+                            {routine.startTime || defaultTimes.start} - {routine.endTime || defaultTimes.end}
+                        </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <FiRepeat size={14} />
-                        <span>{routine.duration}</span>
+                        <span>{routine.duration || defaultTimes.duration}</span>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                    <div className="text-xs font-medium text-gray-400">
-                        Next: <span className="text-gray-600">{routine.nextRun}</span>
-                    </div>
+                <div className="flex justify-end pt-4 border-t border-gray-50">
                     <button className={clsx(
                         "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md active:scale-95",
                         styles.buttonBg,

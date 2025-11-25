@@ -38,19 +38,52 @@ class TaskModel(MongoBaseModel):
     time: Optional[str] = None  # HH:mm
     type: str = "upcoming"  # today, upcoming, done
 
+def _to_12h(time_str: str) -> str:
+    """Convert 24h time string to 12h format"""
+    if not time_str:
+        return time_str
+    try:
+        time_obj = datetime.strptime(time_str, '%H:%M')
+        return time_obj.strftime('%-I:%M %p')
+    except (ValueError, TypeError):
+        return time_str
+
+def _to_24h(time_str: str) -> str:
+    """Convert 12h time string to 24h format"""
+    if not time_str:
+        return time_str
+    
+    # Try with space first (e.g., "2:00 PM")
+    try:
+        time_obj = datetime.strptime(time_str, '%I:%M %p')
+        return time_obj.strftime('%H:%M')
+    except (ValueError, TypeError):
+        pass
+    
+    # Try without space (e.g., "2:00PM")
+    try:
+        time_obj = datetime.strptime(time_str, '%I:%M%p')
+        return time_obj.strftime('%H:%M')
+    except (ValueError, TypeError):
+        pass
+    
+    # If both fail, assume it's already in 24h format or invalid
+    return time_str
+
 class RoutineModel(MongoBaseModel):
     """Routine document model"""
     user_id: str
     title: str
     description: Optional[str] = None
     frequency: str = "daily"  # daily, weekly, monthly
-    time_of_day: Optional[str] = None  # HH:MM format
+    _time_of_day: Optional[str] = None  # Internal storage in 24h format
+    _end_time: Optional[str] = None  # Internal storage in 24h format
     days_of_week: List[str] = []  # mon, tue, etc.
     is_active: bool = True
     
     # Display fields for frontend
     icon: Optional[str] = None  # Icon identifier (e.g., "FiSun", "FiBriefcase")
-    duration: Optional[str] = None  # Display duration (e.g., "45m", "2h", "8h")
+    duration: Optional[str] = None  # Will be auto-calculated
     is_work_block: bool = False  # Identifies work block routines
     
     # Execution tracking
@@ -62,15 +95,85 @@ class RoutineModel(MongoBaseModel):
         from_attributes = True
         populate_by_name = True
     
+    def __init__(self, **data):
+        """Custom init to handle time_of_day and end_time conversion"""
+        # Convert time_of_day to _time_of_day if provided
+        if 'time_of_day' in data and data['time_of_day']:
+            data['_time_of_day'] = _to_24h(data['time_of_day'])
+            del data['time_of_day']
+        
+        # Convert end_time to _end_time if provided
+        if 'end_time' in data and data['end_time']:
+            data['_end_time'] = _to_24h(data['end_time'])
+            del data['end_time']
+        
+        super().__init__(**data)
+    
+    @property
+    def time_of_day(self) -> Optional[str]:
+        """Get time in 12h format"""
+        return _to_12h(self._time_of_day) if self._time_of_day else None
+    
+    @property
+    def end_time(self) -> Optional[str]:
+        """Get end time in 12h format"""
+        return _to_12h(self._end_time) if self._end_time else None
+    
+    @property
+    def startTime(self) -> Optional[str]:
+        """Alias for time_of_day for frontend compatibility"""
+        return self.time_of_day
+    
+    @property
+    def endTime(self) -> Optional[str]:
+        """Alias for end_time for frontend compatibility"""
+        return self.end_time
+
+    def calculate_duration(self) -> Optional[str]:
+        """Calculate duration based on start and end times"""
+        if not self.time_of_day or not self.end_time:
+            return None
+            
+        try:
+            # Parse start time
+            start_h, start_m = map(int, self.time_of_day.split(':'))
+            # Parse end time
+            end_h, end_m = map(int, self.end_time.split(':'))
+            
+            # Calculate total minutes
+            total_minutes = (end_h * 60 + end_m) - (start_h * 60 + start_m)
+            
+            # Handle overnight case
+            if total_minutes < 0:
+                total_minutes += 24 * 60
+                
+            # Convert to hours and minutes
+            hours = total_minutes // 60
+            minutes = total_minutes % 60
+            
+            # Format as "1h 30m" or "45m" or "2h"
+            if hours > 0:
+                return f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+            return f"{minutes}m"
+        except (ValueError, IndexError):
+            return None
+
     def model_dump(self, **kwargs):
-        """Override to include computed properties"""
+        """Override to include computed properties and calculate duration"""
         data = super().model_dump(**kwargs)
+        
+        # Calculate duration if not set
+        if self.duration is None and self.time_of_day and self.end_time:
+            self.duration = self.calculate_duration()
+        
         # Add computed properties
         data['startTime'] = self.startTime
+        data['endTime'] = self.endTime
         data['nextRun'] = self.nextRun
         data['isWorkBlock'] = self.isWorkBlock
+        data['duration'] = self.duration or self.calculate_duration()
         
-        # Ensure id is present (fix for serialization issue)
+        # Ensure id is present
         if "id" not in data and "_id" in data:
             data["id"] = str(data["_id"])
         elif "id" in data and isinstance(data["id"], ObjectId):

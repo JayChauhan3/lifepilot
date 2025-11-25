@@ -15,10 +15,14 @@ from app.core.security import get_password_hash, verify_password
 # Email service
 from app.core.email_service import email_service
 
+# Routine service for creating default routines
+from app.services.routine_service import RoutineService
+
 class AuthService:
     def __init__(self):
         self.collection_name = "users"
         self.pending_collection_name = "pending_registrations"
+        self.routine_service = RoutineService()
     
     @property
     def collection(self):
@@ -99,6 +103,14 @@ class AuthService:
         # Insert into main collection
         await self.collection.insert_one(user_dict)
         logger.info("Dev user created and activated", email=email, user_id=user_id)
+        
+        # Create default routines for new user
+        try:
+            await self.routine_service.create_default_routines(user_id)
+            logger.info("Default routines created for new user", user_id=user_id)
+        except Exception as e:
+            logger.error("Failed to create default routines", user_id=user_id, error=str(e))
+            # Don't fail registration if routine creation fails
         
         return UserModel(
             user_id=user_id,

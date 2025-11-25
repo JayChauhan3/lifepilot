@@ -17,7 +17,7 @@ from app.api.users import router as users_router
 from app.api.auth import router as auth_router
 from app.core.orchestrator import orchestrator
 from app.core.websocket_manager import notification_manager
-from app.core.database import connect_to_mongo, close_mongo_connection
+from app.core.database import connect_to_mongo, close_mongo_connection, get_connection_status
 from app.middleware import (
     global_exception_handler,
     http_exception_handler,
@@ -96,8 +96,13 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "lifepilot-api"}
+    """Health check endpoint with database status"""
+    db_status = get_connection_status()
+    return {
+        "status": "healthy",
+        "service": "lifepilot-api",
+        "database": db_status
+    }
 
 @app.websocket("/ws/notifications/{user_id}")
 async def websocket_notifications(websocket: WebSocket, user_id: str):

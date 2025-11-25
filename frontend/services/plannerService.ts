@@ -107,6 +107,7 @@ export const plannerService = {
         const backendRoutine = {
             title: routine.title,
             time_of_day: routine.startTime,
+            end_time: routine.endTime,
             duration: routine.duration,
             icon: routine.icon || 'FiActivity',
             is_work_block: routine.isWorkBlock || false,
@@ -126,6 +127,10 @@ export const plannerService = {
                 authService.removeToken();
                 window.location.href = '/login';
             }
+            if (response.status === 409) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Time conflict detected');
+            }
             throw new Error('Failed to create routine');
         }
 
@@ -138,6 +143,7 @@ export const plannerService = {
 
         if (updates.title !== undefined) backendUpdates.title = updates.title;
         if (updates.startTime !== undefined) backendUpdates.time_of_day = updates.startTime;
+        if (updates.endTime !== undefined) backendUpdates.end_time = updates.endTime;
         if (updates.duration !== undefined) backendUpdates.duration = updates.duration;
         if (updates.icon !== undefined) backendUpdates.icon = updates.icon;
         if (updates.isWorkBlock !== undefined) backendUpdates.is_work_block = updates.isWorkBlock;
@@ -152,6 +158,10 @@ export const plannerService = {
             if (response.status === 401) {
                 authService.removeToken();
                 window.location.href = '/login';
+            }
+            if (response.status === 409) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Time conflict detected');
             }
             throw new Error('Failed to update routine');
         }
@@ -172,5 +182,32 @@ export const plannerService = {
             }
             throw new Error('Failed to delete routine');
         }
+    },
+
+    async checkTimeConflicts(
+        startTime: string,
+        endTime: string,
+        excludeId?: string
+    ): Promise<Routine[]> {
+        const params = new URLSearchParams({
+            start_time: startTime,
+            end_time: endTime,
+            ...(excludeId && { exclude_id: excludeId })
+        });
+
+        const response = await fetch(
+            `${API_BASE_URL}/routines/check-conflicts?${params}`,
+            { headers: getHeaders() }
+        );
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                authService.removeToken();
+                window.location.href = '/login';
+            }
+            throw new Error('Failed to check conflicts');
+        }
+
+        return response.json();
     },
 };
