@@ -98,21 +98,37 @@ async def check_time_conflicts(
     """Check for time conflicts with existing routines"""
     try:
         # Convert times to 24h format if needed
-        from app.models import _to_24h
-        start_24h = _to_24h(start_time)
-        end_24h = _to_24h(end_time)
+        from app.utils.time_utils import normalize_time_to_24h
+        
+        try:
+            # First try to normalize the times (handles both 12h and 24h formats)
+            norm_start = normalize_time_to_24h(start_time)
+            norm_end = normalize_time_to_24h(end_time)
+        except ValueError as e:
+            logger.warning("Invalid time format", start_time=start_time, end_time=end_time, error=str(e))
+            raise HTTPException(status_code=400, detail=f"Invalid time format: {str(e)}")
         
         conflicts = await routine_service.find_time_conflicts(
             current_user.user_id,
-            start_24h,
-            end_24h,
+            norm_start,
+            norm_end,
             exclude_id=exclude_id
         )
-        logger.info("Conflict check completed", conflicts_found=len(conflicts), user_id=current_user.user_id)
+        
+        logger.info("Conflict check completed", 
+                   start_time=start_time,
+                   end_time=end_time,
+                   normalized_start=norm_start,
+                   normalized_end=norm_end,
+                   conflicts_found=len(conflicts), 
+                   user_id=current_user.user_id)
+                   
         return conflicts
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("Failed to check conflicts", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Failed to check conflicts", error=str(e), stack_info=True)
+        raise HTTPException(status_code=500, detail="Failed to check for time conflicts")
 
 @router.delete("/routines/{routine_id}")
 async def delete_routine(routine_id: str, current_user: UserModel = Depends(get_current_user)):

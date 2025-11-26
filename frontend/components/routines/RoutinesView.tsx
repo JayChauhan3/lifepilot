@@ -276,7 +276,7 @@ function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, i
                         >
                             <FiEdit2 size={16} />
                         </button>
-                        {!routine.isWorkBlock && !routine.title.toLowerCase().includes('work') && (
+                        {routine.id !== 'default-work-block' && (
                             <button
                                 onClick={() => onDelete(routine.id)}
                                 className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"

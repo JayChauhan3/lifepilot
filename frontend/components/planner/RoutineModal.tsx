@@ -53,10 +53,10 @@ interface RoutineModalProps {
 }
 
 export default function RoutineModal({ isOpen, onClose, onSave, onDelete, initialData }: RoutineModalProps) {
-    const [title, setTitle] = useState(initialData?.title || '');
-    const [startTime, setStartTime] = useState(initialData?.startTime || '6:00 AM');
-    const [endTime, setEndTime] = useState(initialData?.endTime || '10:00 AM');
-    const [duration, setDuration] = useState(initialData?.duration || '4h');
+    const [title, setTitle] = useState('');
+    const [startTime, setStartTime] = useState('');
+    const [endTime, setEndTime] = useState('');
+    const [duration, setDuration] = useState('');
     const [conflictWarning, setConflictWarning] = useState<string | null>(null);
     const [isCheckingConflict, setIsCheckingConflict] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
@@ -65,32 +65,21 @@ export default function RoutineModal({ isOpen, onClose, onSave, onDelete, initia
     useEffect(() => {
         if (isOpen) {
             if (initialData) {
+                // For existing routine, use its data
                 setTitle(initialData.title || '');
-
-                // Use existing times if available, otherwise use defaults based on title
-                let defaultStartTime = '6:00 AM';
-                let defaultEndTime = '10:00 AM';
-
-                if (initialData.title?.toLowerCase().includes('work')) {
-                    defaultStartTime = '10:00 AM';
-                    defaultEndTime = '5:00 PM';
-                } else if (initialData.title?.toLowerCase().includes('evening')) {
-                    defaultStartTime = '5:00 PM';
-                    defaultEndTime = '10:00 PM';
-                } else if (initialData.title?.toLowerCase().includes('sleep')) {
-                    defaultStartTime = '10:00 PM';
-                    defaultEndTime = '6:00 AM';
-                }
-
-                setStartTime(initialData.startTime || defaultStartTime);
-                setEndTime(initialData.endTime || defaultEndTime);
-                setDuration(initialData.duration || calculateDuration(defaultStartTime, defaultEndTime));
+                setStartTime(initialData.startTime || '');
+                setEndTime(initialData.endTime || '');
+                setDuration(initialData.duration || '');
             } else {
-                // Default values for new routine
-                setStartTime('6:00 AM');
-                setEndTime('10:00 AM');
-                setDuration('4h');
+                // For new routine, start with empty values
+                setTitle('');
+                setStartTime('');
+                setEndTime('');
+                setDuration('');
             }
+            // Reset error and warning states
+            setConflictWarning(null);
+            setSaveError(null);
         }
     }, [isOpen, initialData]);
 
@@ -207,33 +196,53 @@ export default function RoutineModal({ isOpen, onClose, onSave, onDelete, initia
         e.preventDefault();
         setSaveError(null);
 
-        // Simple next run calculation logic for demo
-        const now = new Date();
-        const start24h = to24Hour(startTime);
-        const [hours, minutes] = start24h.split(':').map(Number);
+        // Validate required fields
+        if (!title.trim()) {
+            setSaveError('Please enter a title for the routine');
+            return;
+        }
 
-        const runDate = new Date();
-        runDate.setHours(hours, minutes, 0, 0);
+        if (!startTime || !endTime) {
+            setSaveError('Please set both start and end times');
+            return;
+        }
 
+        // Calculate duration if not set
+        const calculatedDuration = duration || calculateDuration(startTime, endTime);
+
+        // Simple next run calculation
         let nextRun = '';
-        if (runDate > now) {
-            nextRun = `Today, ${startTime}`;
-        } else {
-            // If the time has passed for today, schedule for tomorrow
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(hours, minutes, 0, 0);
-            nextRun = `Tomorrow, ${startTime}`;
+        try {
+            const start24h = to24Hour(startTime);
+            const [hours, minutes] = start24h.split(':').map(Number);
+            const now = new Date();
+            const runDate = new Date();
+            runDate.setHours(hours, minutes, 0, 0);
+
+            if (runDate > now) {
+                nextRun = `Today, ${startTime}`;
+            } else {
+                // If the time has passed for today, schedule for tomorrow
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(hours, minutes, 0, 0);
+                nextRun = `Tomorrow, ${startTime}`;
+            }
+        } catch (error) {
+            console.error('Error calculating next run time:', error);
+            // Continue without next run time if there's an error
         }
 
         const routineData = {
-            title,
+            title: title.trim(),
             startTime,  // Already in 12h format
             endTime,    // Already in 12h format
-            duration,
+            duration: calculatedDuration,
             nextRun,
             // Default icon for now, could add picker later
             icon: initialData?.icon || 'FiActivity',
+            // Only set is_work_block if this is a new routine with 'work' in the title
+            is_work_block: initialData ? initialData.is_work_block : title.toLowerCase().includes('work'),
             // Ensure we're not sending internal fields to the backend
             _time_of_day: undefined,
             _end_time: undefined

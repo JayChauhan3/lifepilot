@@ -183,31 +183,4 @@ export const plannerService = {
             throw new Error('Failed to delete routine');
         }
     },
-
-    async checkTimeConflicts(
-        startTime: string,
-        endTime: string,
-        excludeId?: string
-    ): Promise<Routine[]> {
-        const params = new URLSearchParams({
-            start_time: startTime,
-            end_time: endTime,
-            ...(excludeId && { exclude_id: excludeId })
-        });
-
-        const response = await fetch(
-            `${API_BASE_URL}/routines/check-conflicts?${params}`,
-            { headers: getHeaders() }
-        );
-
-        if (!response.ok) {
-            if (response.status === 401) {
-                authService.removeToken();
-                window.location.href = '/login';
-            }
-            throw new Error('Failed to check conflicts');
-        }
-
-        return response.json();
-    },
 };

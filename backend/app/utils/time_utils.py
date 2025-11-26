@@ -7,27 +7,43 @@ from datetime import datetime, timedelta
 
 def parse_time_to_minutes(time_str: str) -> int:
     """
-    Convert HH:MM time string to minutes since midnight.
+    Convert a time string to minutes since midnight.
     
-    Args:
-        time_str: Time in 24h format (e.g., "14:30", "09:00")
-    
-    Returns:
-        Minutes since midnight (0-1439)
-    
-    Examples:
-        >>> parse_time_to_minutes("00:00")
-        0
-        >>> parse_time_to_minutes("14:30")
-        870
-        >>> parse_time_to_minutes("23:59")
-        1439
+    Accepts either 24h format (e.g. "14:30") or 12h format with AM/PM (e.g. "2:30 PM").
     """
+    if time_str is None:
+        raise ValueError("Invalid time format: None provided")
+    
+    normalized = time_str.strip()
+    
+    # Try 24-hour format first
     try:
-        hours, minutes = map(int, time_str.split(':'))
-        return hours * 60 + minutes
+        hours, minutes = map(int, normalized.split(':'))
+        if 0 <= hours < 24 and 0 <= minutes < 60:
+            return hours * 60 + minutes
     except (ValueError, AttributeError):
-        raise ValueError(f"Invalid time format: {time_str}. Expected HH:MM")
+        pass
+    
+    # Fall back to 12-hour format with AM/PM
+    try:
+        dt = datetime.strptime(normalized.upper().replace('.', ''), '%I:%M %p')
+        return dt.hour * 60 + dt.minute
+    except ValueError:
+        try:
+            dt = datetime.strptime(normalized.upper().replace('.', ''), '%I:%M%p')
+            return dt.hour * 60 + dt.minute
+        except ValueError:
+            raise ValueError(f"Invalid time format: {time_str}. Expected HH:MM or HH:MM AM/PM")
+
+
+def normalize_time_to_24h(time_str: str) -> str:
+    """
+    Normalize any supported time string to HH:MM (24h) format.
+    """
+    minutes = parse_time_to_minutes(time_str)
+    hours = minutes // 60
+    mins = minutes % 60
+    return f"{hours:02d}:{mins:02d}"
 
 
 def times_overlap(start1: str, end1: str, start2: str, end2: str) -> bool:
