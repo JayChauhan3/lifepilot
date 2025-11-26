@@ -53,10 +53,10 @@ interface RoutineModalProps {
 }
 
 export default function RoutineModal({ isOpen, onClose, onSave, onDelete, initialData }: RoutineModalProps) {
-    const [title, setTitle] = useState('');
-    const [startTime, setStartTime] = useState('');
-    const [endTime, setEndTime] = useState('');
-    const [duration, setDuration] = useState('');
+    const [title, setTitle] = useState(initialData?.title || '');
+    const [startTime, setStartTime] = useState(initialData?.startTime || '6:00 AM');
+    const [endTime, setEndTime] = useState(initialData?.endTime || '10:00 AM');
+    const [duration, setDuration] = useState(initialData?.duration || '4h');
     const [conflictWarning, setConflictWarning] = useState<string | null>(null);
     const [isCheckingConflict, setIsCheckingConflict] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
@@ -65,19 +65,17 @@ export default function RoutineModal({ isOpen, onClose, onSave, onDelete, initia
     useEffect(() => {
         if (isOpen) {
             if (initialData) {
-                // For existing routine, use its data
                 setTitle(initialData.title || '');
                 setStartTime(initialData.startTime || '');
                 setEndTime(initialData.endTime || '');
                 setDuration(initialData.duration || '');
             } else {
-                // For new routine, start with empty values
+                // Default values for new routine - ALL EMPTY
                 setTitle('');
                 setStartTime('');
                 setEndTime('');
                 setDuration('');
             }
-            // Reset error and warning states
             setConflictWarning(null);
             setSaveError(null);
         }
@@ -196,53 +194,33 @@ export default function RoutineModal({ isOpen, onClose, onSave, onDelete, initia
         e.preventDefault();
         setSaveError(null);
 
-        // Validate required fields
-        if (!title.trim()) {
-            setSaveError('Please enter a title for the routine');
-            return;
-        }
+        // Simple next run calculation logic for demo
+        const now = new Date();
+        const start24h = to24Hour(startTime);
+        const [hours, minutes] = start24h.split(':').map(Number);
 
-        if (!startTime || !endTime) {
-            setSaveError('Please set both start and end times');
-            return;
-        }
+        const runDate = new Date();
+        runDate.setHours(hours, minutes, 0, 0);
 
-        // Calculate duration if not set
-        const calculatedDuration = duration || calculateDuration(startTime, endTime);
-
-        // Simple next run calculation
         let nextRun = '';
-        try {
-            const start24h = to24Hour(startTime);
-            const [hours, minutes] = start24h.split(':').map(Number);
-            const now = new Date();
-            const runDate = new Date();
-            runDate.setHours(hours, minutes, 0, 0);
-
-            if (runDate > now) {
-                nextRun = `Today, ${startTime}`;
-            } else {
-                // If the time has passed for today, schedule for tomorrow
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                tomorrow.setHours(hours, minutes, 0, 0);
-                nextRun = `Tomorrow, ${startTime}`;
-            }
-        } catch (error) {
-            console.error('Error calculating next run time:', error);
-            // Continue without next run time if there's an error
+        if (runDate > now) {
+            nextRun = `Today, ${startTime}`;
+        } else {
+            // If the time has passed for today, schedule for tomorrow
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(hours, minutes, 0, 0);
+            nextRun = `Tomorrow, ${startTime}`;
         }
 
         const routineData = {
-            title: title.trim(),
+            title,
             startTime,  // Already in 12h format
             endTime,    // Already in 12h format
-            duration: calculatedDuration,
+            duration,
             nextRun,
             // Default icon for now, could add picker later
             icon: initialData?.icon || 'FiActivity',
-            // Only set is_work_block if this is a new routine with 'work' in the title
-            is_work_block: initialData ? initialData.is_work_block : title.toLowerCase().includes('work'),
             // Ensure we're not sending internal fields to the backend
             _time_of_day: undefined,
             _end_time: undefined
@@ -299,7 +277,11 @@ export default function RoutineModal({ isOpen, onClose, onSave, onDelete, initia
                                         type="text"
                                         value={title}
                                         onChange={(e) => setTitle(e.target.value)}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-black"
+                                        disabled={initialData?.canEditTitle === false}
+                                        className={clsx(
+                                            "w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-black",
+                                            initialData?.canEditTitle === false && "bg-gray-100 text-gray-500 cursor-not-allowed"
+                                        )}
                                         placeholder="e.g. Morning Workout"
                                         required
                                     />
@@ -384,10 +366,10 @@ export default function RoutineModal({ isOpen, onClose, onSave, onDelete, initia
                                     </button>
                                     <button
                                         type="submit"
-                                        disabled={!!conflictWarning || isCheckingConflict}
+                                        disabled={!!conflictWarning || isCheckingConflict || !startTime || !endTime || !title}
                                         className={clsx(
                                             "px-6 py-2 text-sm font-medium rounded-xl shadow-sm transition-all active:scale-95",
-                                            conflictWarning || isCheckingConflict
+                                            (conflictWarning || isCheckingConflict || !startTime || !endTime || !title)
                                                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                                                 : "bg-primary-600 hover:bg-primary-700 text-white shadow-primary-200"
                                         )}

@@ -20,4 +20,10 @@ export interface Routine {
     nextRun: string;   // calculated string
     icon?: string;     // Optional icon name or identifier
     isWorkBlock?: boolean; // Identifies work block routines
+
+    // Protection & Permissions
+    isProtected?: boolean;
+    canDelete?: boolean;
+    canEditTitle?: boolean;
+    canEditTime?: boolean;
 }

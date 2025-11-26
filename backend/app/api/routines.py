@@ -142,6 +142,10 @@ async def delete_routine(routine_id: str, current_user: UserModel = Depends(get_
             
         logger.info("Routine deleted", routine_id=routine_id, user_id=current_user.user_id)
         return {"message": "Routine deleted successfully"}
+    except ValueError as e:
+        # Business logic error (e.g. protected routine)
+        logger.warning("Routine deletion failed", error=str(e), routine_id=routine_id)
+        raise HTTPException(status_code=403, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:

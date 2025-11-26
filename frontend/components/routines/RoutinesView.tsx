@@ -11,18 +11,18 @@ import ConfirmationModal from "../planner/ConfirmationModal";
 
 // Convert 24h time string to 12h format (e.g., '13:30' -> '1:30 PM')
 const to12Hour = (time24: string): string => {
-  if (!time24) return '';
-  
-  // If already in 12h format, return as is
-  if (time24.includes('AM') || time24.includes('PM')) {
-    return time24;
-  }
-  
-  const [hours, minutes] = time24.split(':').map(Number);
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const hours12 = hours % 12 || 12;
-  
-  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+    if (!time24) return '';
+
+    // If already in 12h format, return as is
+    if (time24.includes('AM') || time24.includes('PM')) {
+        return time24;
+    }
+
+    const [hours, minutes] = time24.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
 };
 
 // Helper to map icon string to component
@@ -135,16 +135,16 @@ export default function RoutinesView() {
         if (timeStr.includes('AM') || timeStr.includes('PM')) {
             const [time, period] = timeStr.split(' ');
             let [hours, minutes] = time.split(':').map(Number);
-            
+
             if (period === 'PM' && hours !== 12) {
                 hours += 12;
             } else if (period === 'AM' && hours === 12) {
                 hours = 0;
             }
-            
+
             return hours * 60 + (minutes || 0);
         }
-        
+
         // Handle 24-hour format
         const [hours, minutes] = timeStr.split(':').map(Number);
         return hours * 60 + (minutes || 0);
@@ -156,7 +156,7 @@ export default function RoutinesView() {
         const bTime = timeToMinutes(b.startTime);
         return aTime - bTime;
     });
-    
+
     // Add layoutId for smooth animations when reordering
     const getRoutineLayoutId = (id: string) => `routine-${id}`;
 
@@ -230,7 +230,7 @@ function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, i
         if (lowerTitle.includes('sleep')) return { start: '10:00 PM', end: '6:00 AM', duration: '8h' };
         return { start: '--:--', end: '--:--', duration: '0h' };
     };
-    
+
     const defaultTimes = getDefaultTimes(routine.title);
     const Icon = ICON_MAP[routine.icon || 'FiActivity'] || FiActivity;
 
@@ -276,7 +276,7 @@ function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, i
                         >
                             <FiEdit2 size={16} />
                         </button>
-                        {routine.id !== 'default-work-block' && (
+                        {routine.canDelete !== false && (
                             <button
                                 onClick={() => onDelete(routine.id)}
                                 className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"

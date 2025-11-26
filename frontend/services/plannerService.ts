@@ -180,7 +180,37 @@ export const plannerService = {
                 authService.removeToken();
                 window.location.href = '/login';
             }
+            // Handle 403 for protected routines
+            if (response.status === 403) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Cannot delete this routine');
+            }
             throw new Error('Failed to delete routine');
         }
+    },
+
+    async checkTimeConflicts(startTime: string, endTime: string, excludeId?: string): Promise<Routine[]> {
+        const params = new URLSearchParams({
+            start_time: startTime,
+            end_time: endTime,
+        });
+
+        if (excludeId) {
+            params.append('exclude_id', excludeId);
+        }
+
+        const response = await fetch(`${API_BASE_URL}/routines/check-conflicts?${params.toString()}`, {
+            headers: getHeaders(),
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                authService.removeToken();
+                window.location.href = '/login';
+            }
+            throw new Error('Failed to check conflicts');
+        }
+
+        return response.json();
     },
 };

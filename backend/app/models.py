@@ -89,6 +89,12 @@ class RoutineModel(MongoBaseModel):
     # Execution tracking
     last_completed_at: Optional[datetime] = None
     streak_count: int = 0
+
+    # Protection & Permissions
+    is_protected: bool = False  # If True, some actions are restricted
+    can_delete: bool = True     # If False, cannot be deleted
+    can_edit_title: bool = True # If False, title cannot be changed
+    can_edit_time: bool = True  # If False, time cannot be changed
     
     class Config:
         """Pydantic config to include computed properties in serialization"""
@@ -171,7 +177,14 @@ class RoutineModel(MongoBaseModel):
         data['endTime'] = self.endTime
         data['nextRun'] = self.nextRun
         data['isWorkBlock'] = self.isWorkBlock
+        data['isWorkBlock'] = self.isWorkBlock
         data['duration'] = self.duration or self.calculate_duration()
+        
+        # Add protection fields
+        data['isProtected'] = self.is_protected
+        data['canDelete'] = self.can_delete
+        data['canEditTitle'] = self.can_edit_title
+        data['canEditTime'] = self.can_edit_time
         
         # Ensure id is present
         if "id" not in data and "_id" in data:
@@ -247,6 +260,22 @@ class RoutineModel(MongoBaseModel):
     def isWorkBlock(self) -> bool:
         """Alias for is_work_block for frontend compatibility"""
         return self.is_work_block
+
+    @property
+    def isProtected(self) -> bool:
+        return self.is_protected
+
+    @property
+    def canDelete(self) -> bool:
+        return self.can_delete
+
+    @property
+    def canEditTitle(self) -> bool:
+        return self.can_edit_title
+
+    @property
+    def canEditTime(self) -> bool:
+        return self.can_edit_time
 
 class UserModel(MongoBaseModel):
     """User document model"""

@@ -5,6 +5,7 @@ from bson import ObjectId
 from app.core.database import get_database
 from app.models import RoutineModel
 from app.utils.time_utils import times_overlap, normalize_time_to_24h
+from app.utils.seed_routines import seed_default_routines
 
 logger = structlog.get_logger()
 
@@ -53,95 +54,7 @@ class RoutineService:
         return RoutineModel(**created_routine)
     async def create_default_routines(self, user_id: str) -> List[RoutineModel]:
         """Create default routines for a new user"""
-        default_routines_data = [
-            {
-                "title": "Morning Routine",
-                "description": "Start the day right with morning activities",
-                "frequency": "daily",
-                "time_of_day": "06:00",  # 24h format for internal use
-                "end_time": "09:00",     # 24h format for internal use
-                "startTime": "6:00 AM",  # 12h format for display
-                "endTime": "9:00 AM",    # 12h format for display
-                "days_of_week": [],
-                "is_active": True,
-                "icon": "FiSun",
-                "is_work_block": False,
-                "duration": "3h",
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
-            },
-            {
-                "_id": "default-work-block",
-                "title": "Work Block",
-                "description": "Focused work time",
-                "frequency": "daily",
-                "time_of_day": "09:00",  # 24h format
-                "end_time": "18:00",     # 24h format
-                "startTime": "9:00 AM",  # 12h format
-                "endTime": "6:00 PM",    # 12h format
-                "days_of_week": [],
-                "is_active": True,
-                "icon": "FiBriefcase",
-                "is_work_block": True,
-                "duration": "9h",
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
-            },
-            {
-                "title": "Evening Routine",
-                "description": "Wind down and relax",
-                "frequency": "daily",
-                "time_of_day": "18:00",  # 24h format
-                "end_time": "22:00",     # 24h format
-                "startTime": "6:00 PM",  # 12h format
-                "endTime": "10:00 PM",   # 12h format
-                "days_of_week": [],
-                "is_active": True,
-                "icon": "FiMoon",
-                "is_work_block": False,
-                "duration": "4h",
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
-            },
-            {
-                "title": "Sleep",
-                "description": "Rest and recharge for the next day",
-                "frequency": "daily",
-                "time_of_day": "22:00",  # 24h format
-                "end_time": "06:00",     # 24h format (next day)
-                "startTime": "10:00 PM", # 12h format
-                "endTime": "6:00 AM",    # 12h format
-                "days_of_week": [],
-                "is_active": True,
-                "icon": "FiMoon",
-                "is_work_block": False,
-                "duration": "8h",
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
-            }
-        ]
-        
-        routines = []
-        for data in default_routines_data:
-            # Create the routine model to trigger duration calculation
-            routine = RoutineModel(user_id=user_id, **data)
-            
-            # Ensure duration is calculated
-            if routine.duration is None and routine.time_of_day and routine.end_time:
-                routine.duration = routine.calculate_duration()
-            
-            # Prepare the data for database insertion
-            routine_dict = routine.model_dump(by_alias=True, exclude=["id"])
-            
-            # Insert into database
-            result = await self.collection.insert_one(routine_dict)
-            
-            # Retrieve the created routine
-            created_routine = await self.collection.find_one({"_id": result.inserted_id})
-            routines.append(RoutineModel(**created_routine))
-        
-        logger.info("Created default routines for user", user_id=user_id, count=len(routines))
-        return routines
+        return await seed_default_routines(user_id)
 
     async def get_routines(self, user_id: str) -> List[RoutineModel]:
         """Get all routines for a user. If none exist, create default routines."""
@@ -164,6 +77,24 @@ class RoutineService:
         existing = await self.collection.find_one({"_id": ObjectId(routine_id), "user_id": user_id})
         if not existing:
             return None
+            
+        # Check protection flags
+        if existing.get("can_edit_title") is False and "title" in updates:
+            if updates["title"] != existing["title"]:
+                raise ValueError("Title cannot be changed for this routine")
+                
+        if existing.get("can_edit_time") is False and ("time_of_day" in updates or "end_time" in updates):
+             # Check if times are actually changing
+             new_start = updates.get("time_of_day")
+             new_end = updates.get("end_time")
+             
+             # Get existing times (handle both aliased and internal names)
+             old_start = existing.get("time_of_day") or existing.get("_time_of_day")
+             old_end = existing.get("end_time") or existing.get("_end_time")
+             
+             # If times are changing, raise error
+             if (new_start and new_start != old_start) or (new_end and new_end != old_end):
+                 raise ValueError("Time cannot be changed for this routine")
         
         # Create a temporary routine model with the updates to properly convert time formats
         temp_updates = {**existing, **updates}
@@ -315,7 +246,20 @@ class RoutineService:
     async def delete_routine(self, user_id: str, routine_id: str) -> bool:
         """Delete a routine"""
         try:
+            # Check if routine exists and can be deleted
+            routine = await self.collection.find_one({"_id": ObjectId(routine_id), "user_id": user_id})
+            if not routine:
+                return False
+                
+            # Check protection flag
+            if routine.get("can_delete") is False:
+                logger.warning("Attempted to delete protected routine", routine_id=routine_id, user_id=user_id)
+                raise ValueError("This routine cannot be deleted")
+                
             result = await self.collection.delete_one({"_id": ObjectId(routine_id), "user_id": user_id})
             return result.deleted_count > 0
-        except Exception:
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error("Failed to delete routine", error=str(e))
             return False
