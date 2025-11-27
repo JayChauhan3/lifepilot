@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, BeforeValidator
+from pydantic import BaseModel, Field, BeforeValidator, model_validator
 from typing import Optional, List, Annotated, Any
 from datetime import datetime
 from bson import ObjectId
@@ -8,7 +8,7 @@ PyObjectId = Annotated[str, BeforeValidator(str)]
 
 class MongoBaseModel(BaseModel):
     """Base model for MongoDB documents"""
-    id: Optional[PyObjectId] = Field(alias="_id", default=None, serialization_alias="id")
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -76,8 +76,8 @@ class RoutineModel(MongoBaseModel):
     title: str
     description: Optional[str] = None
     frequency: str = "daily"  # daily, weekly, monthly
-    _time_of_day: Optional[str] = None  # Internal storage in 24h format
-    _end_time: Optional[str] = None  # Internal storage in 24h format
+    time_of_day_24h: Optional[str] = None  # Internal storage in 24h format
+    end_time_24h: Optional[str] = None  # Internal storage in 24h format
     days_of_week: List[str] = []  # mon, tue, etc.
     is_active: bool = True
     
@@ -101,29 +101,37 @@ class RoutineModel(MongoBaseModel):
         from_attributes = True
         populate_by_name = True
     
-    def __init__(self, **data):
-        """Custom init to handle time_of_day and end_time conversion"""
-        # Convert time_of_day to _time_of_day if provided
-        if 'time_of_day' in data and data['time_of_day']:
-            data['_time_of_day'] = _to_24h(data['time_of_day'])
-            del data['time_of_day']
+    
+    @model_validator(mode='before')
+    @classmethod
+    def convert_time_fields(cls, data: Any) -> Any:
+        """Convert time_of_day and end_time from 12h to 24h format before validation"""
+        if isinstance(data, dict):
+            # Handle time_of_day conversion
+            if 'time_of_day' in data and data['time_of_day']:
+                data['time_of_day_24h'] = _to_24h(data['time_of_day'])
+                del data['time_of_day']
+            elif 'startTime' in data and data['startTime'] and 'time_of_day_24h' not in data:
+                data['time_of_day_24h'] = _to_24h(data['startTime'])
+            
+            # Handle end_time conversion
+            if 'end_time' in data and data['end_time']:
+                data['end_time_24h'] = _to_24h(data['end_time'])
+                del data['end_time']
+            elif 'endTime' in data and data['endTime'] and 'end_time_24h' not in data:
+                data['end_time_24h'] = _to_24h(data['endTime'])
         
-        # Convert end_time to _end_time if provided
-        if 'end_time' in data and data['end_time']:
-            data['_end_time'] = _to_24h(data['end_time'])
-            del data['end_time']
-        
-        super().__init__(**data)
+        return data
     
     @property
     def time_of_day(self) -> Optional[str]:
         """Get time in 12h format"""
-        return _to_12h(self._time_of_day) if self._time_of_day else None
+        return _to_12h(self.time_of_day_24h) if self.time_of_day_24h else None
     
     @property
     def end_time(self) -> Optional[str]:
         """Get end time in 12h format"""
-        return _to_12h(self._end_time) if self._end_time else None
+        return _to_12h(self.end_time_24h) if self.end_time_24h else None
     
     @property
     def startTime(self) -> Optional[str]:
@@ -166,7 +174,8 @@ class RoutineModel(MongoBaseModel):
 
     def model_dump(self, **kwargs):
         """Override to include computed properties and calculate duration"""
-        data = super().model_dump(**kwargs)
+        # Use mode='python' to get all fields including private ones
+        data = super().model_dump(mode='python', **kwargs)
         
         # Calculate duration if not set
         if self.duration is None and self.time_of_day and self.end_time:
@@ -177,7 +186,6 @@ class RoutineModel(MongoBaseModel):
         data['endTime'] = self.endTime
         data['nextRun'] = self.nextRun
         data['isWorkBlock'] = self.isWorkBlock
-        data['isWorkBlock'] = self.isWorkBlock
         data['duration'] = self.duration or self.calculate_duration()
         
         # Add protection fields
@@ -185,6 +193,16 @@ class RoutineModel(MongoBaseModel):
         data['canDelete'] = self.can_delete
         data['canEditTitle'] = self.can_edit_title
         data['canEditTime'] = self.can_edit_time
+        
+        # Ensure internal time fields are preserved for database storage
+        if hasattr(self, 'time_of_day_24h'):
+            data['time_of_day_24h'] = self.time_of_day_24h
+        if hasattr(self, 'end_time_24h'):
+            data['end_time_24h'] = self.end_time_24h
+        
+        # Remove _id if it is None so Mongo generates it
+        if "_id" in data and data["_id"] is None:
+            del data["_id"]
         
         # Ensure id is present
         if "id" not in data and "_id" in data:
@@ -204,11 +222,11 @@ class RoutineModel(MongoBaseModel):
         """Calculate next run time based on frequency and current time"""
         from datetime import datetime, timedelta
         
-        if not self.time_of_day:
+        if not self.time_of_day_24h:
             return "Not scheduled"
         
         now = datetime.now()
-        time_parts = self.time_of_day.split(":")
+        time_parts = self.time_of_day_24h.split(":")
         hour = int(time_parts[0])
         minute = int(time_parts[1]) if len(time_parts) > 1 else 0
         

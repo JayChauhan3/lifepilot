@@ -57,7 +57,8 @@ async def get_routines(current_user: UserModel = Depends(get_current_user)):
     try:
         routines = await routine_service.get_routines(current_user.user_id)
         logger.info("Routines retrieved", count=len(routines), user_id=current_user.user_id)
-        return routines
+        # Explicitly serialize with by_alias=True to ensure frontend compatibility
+        return [routine.model_dump(by_alias=True) for routine in routines]
     except Exception as e:
         logger.error("Failed to get routines", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))

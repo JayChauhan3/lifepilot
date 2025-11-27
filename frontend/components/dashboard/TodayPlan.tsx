@@ -234,33 +234,42 @@ export default function TodayPlan() {
 
                                     {/* Work Block Subtasks */}
                                     {item.isWorkBlock && item.subTasks && item.subTasks.length > 0 && (
-                                        <div className="mt-2 bg-blue-50/30 rounded-xl p-2 border border-blue-100/50">
+                                        <div key={`work-block-${item.id}`} className="mt-2 bg-blue-50/30 rounded-xl p-2 border border-blue-100/50">
                                             {item.isOverloaded && (
-                                                <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg mb-2 border border-amber-100">
+                                                <div key={`overload-${item.id}`} className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg mb-2 border border-amber-100">
                                                     <FiAlertCircle size={12} />
                                                     <span>Overload!</span>
                                                 </div>
                                             )}
                                             <div className="space-y-1">
-                                                {item.subTasks.map(task => (
-                                                    <div key={task.id} className={clsx(
-                                                        "flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded-lg border transition-colors",
-                                                        task.isCompleted
-                                                            ? "bg-gray-50/50 text-gray-400 border-transparent"
-                                                            : "bg-white text-gray-600 border-blue-100/30 shadow-sm"
-                                                    )}>
-                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                            <div className={clsx(
-                                                                "w-1.5 h-1.5 rounded-full shrink-0",
-                                                                task.isCompleted ? "bg-gray-300" : "bg-blue-400"
-                                                            )} />
-                                                            <span className={clsx("truncate font-medium", task.isCompleted && "line-through")}>
+                                                {item.subTasks.map((task, taskIndex) => (
+                                                    <div 
+                                                        key={`task-${task.id || `task-${taskIndex}`}`}
+                                                        className={clsx(
+                                                            "flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded-lg border transition-colors",
+                                                            task.isCompleted
+                                                                ? "bg-gray-50/50 text-gray-400 border-transparent"
+                                                                : "bg-white text-gray-600 border-blue-100/30 shadow-sm"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            {task.isCompleted ? (
+                                                                <FiCheckCircle size={14} className="text-green-500" />
+                                                            ) : (
+                                                                <div className="w-2 h-2 rounded-full bg-blue-400" />
+                                                            )}
+                                                            <span className={clsx(
+                                                                "line-clamp-1",
+                                                                task.isCompleted && "line-through"
+                                                            )}>
                                                                 {task.title}
                                                             </span>
                                                         </div>
-                                                        <span className="text-[10px] text-gray-400 font-mono shrink-0">
-                                                            {formatTime(task.time)}
-                                                        </span>
+                                                        {task.time && task.time !== "00:00" && (
+                                                            <span key={`time-${task.id || taskIndex}`} className="text-[10px] text-gray-400 whitespace-nowrap">
+                                                                {formatTime(task.time)}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>

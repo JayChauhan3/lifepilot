@@ -117,13 +117,19 @@ export default function RoutinesView() {
         }
     };
 
-    const handleDeleteRoutine = (id: string) => {
-        setConfirmConfig({
-            isOpen: true,
-            title: 'Delete Routine?',
-            message: 'Are you sure you want to delete this routine? This action cannot be undone.',
-            onConfirm: () => deleteRoutine(id),
-            isDanger: true,
+    const handleDeleteRoutine = async (id: string): Promise<void> => {
+        // Create a promise that resolves when the user confirms the deletion
+        return new Promise((resolve) => {
+            setConfirmConfig({
+                isOpen: true,
+                title: 'Delete Routine?',
+                message: 'Are you sure you want to delete this routine? This action cannot be undone.',
+                onConfirm: async () => {
+                    await deleteRoutine(id);
+                    resolve();
+                },
+                isDanger: true,
+            });
         });
     };
 
@@ -158,7 +164,8 @@ export default function RoutinesView() {
     });
 
     // Add layoutId for smooth animations when reordering
-    const getRoutineLayoutId = (id: string) => `routine-${id}`;
+    // Include index in the layout ID to ensure uniqueness during reordering
+    const getRoutineLayoutId = (id: string, index: number) => `routine-${id}-${index}`;
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -179,24 +186,27 @@ export default function RoutinesView() {
 
             {/* Routine Cards - Sorted from Morning to Night */}
             <AnimatePresence mode="popLayout">
-                {sortedRoutines.map((routine) => (
-                    <motion.div
-                        key={routine.id}
-                        layoutId={getRoutineLayoutId(routine.id)}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 50 }}
-                        className="h-full"
-                    >
-                        <RoutineCard
-                            routine={routine}
-                            index={sortedRoutines.findIndex(r => r.id === routine.id) + 1}
-                            onEdit={() => handleEditRoutine(routine)}
-                            onDelete={() => handleDeleteRoutine(routine.id)}
-                        />
-                    </motion.div>
-                ))}
+                {sortedRoutines.map((routine, index) => {
+                    const layoutId = getRoutineLayoutId(routine.id, index);
+                    return (
+                        <motion.div
+                            key={layoutId}
+                            layoutId={layoutId}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 50 }}
+                            className="h-full"
+                        >
+                            <RoutineCard
+                                routine={routine}
+                                index={index + 1}
+                                onEdit={() => handleEditRoutine(routine)}
+                                onDelete={() => handleDeleteRoutine(routine.id)}
+                            />
+                        </motion.div>
+                    )
+                })}
             </AnimatePresence>
 
             <RoutineModal
@@ -222,16 +232,6 @@ export default function RoutinesView() {
 
 function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, index: number, onEdit: () => void, onDelete: (id: string) => void }) {
     // Default times based on routine title
-    const getDefaultTimes = (title: string) => {
-        const lowerTitle = title.toLowerCase();
-        if (lowerTitle.includes('morning')) return { start: '6:00 AM', end: '10:00 AM', duration: '4h' };
-        if (lowerTitle.includes('work')) return { start: '10:00 AM', end: '5:00 PM', duration: '7h' };
-        if (lowerTitle.includes('evening')) return { start: '5:00 PM', end: '10:00 PM', duration: '5h' };
-        if (lowerTitle.includes('sleep')) return { start: '10:00 PM', end: '6:00 AM', duration: '8h' };
-        return { start: '--:--', end: '--:--', duration: '0h' };
-    };
-
-    const defaultTimes = getDefaultTimes(routine.title);
     const Icon = ICON_MAP[routine.icon || 'FiActivity'] || FiActivity;
 
     // Determine style based on title keywords or default
@@ -270,13 +270,16 @@ function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, i
                         <Icon size={24} />
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-2 group-hover:translate-x-0">
+                        {/* Edit Button - Always visible */}
                         <button
                             onClick={onEdit}
                             className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                         >
                             <FiEdit2 size={16} />
                         </button>
-                        {routine.canDelete !== false && (
+
+                        {/* Delete Button - Hide for Work Block */}
+                        {!routine.isWorkBlock && (
                             <button
                                 onClick={() => onDelete(routine.id)}
                                 className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
@@ -293,12 +296,13 @@ function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, i
                     <div className="flex items-center gap-1.5">
                         <FiClock size={14} />
                         <span>
-                            {routine.startTime || defaultTimes.start} - {routine.endTime || defaultTimes.end}
+                            {routine.startTime ? to12Hour(routine.startTime) : '--:--'} - 
+                            {routine.endTime ? to12Hour(routine.endTime) : '--:--'}
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <FiRepeat size={14} />
-                        <span>{routine.duration || defaultTimes.duration}</span>
+                        <span>{routine.duration || '--'}</span>
                     </div>
                 </div>
 

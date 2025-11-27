@@ -87,11 +87,13 @@ export const plannerService = {
 
     // Routine operations
     async getRoutines(): Promise<Routine[]> {
+        console.log('Fetching routines from:', `${API_BASE_URL}/routines`);
         const response = await fetch(`${API_BASE_URL}/routines`, {
             headers: getHeaders(),
         });
 
         if (!response.ok) {
+            console.error('Failed to fetch routines:', response.status, response.statusText);
             if (response.status === 401) {
                 authService.removeToken();
                 window.location.href = '/login';
@@ -99,7 +101,57 @@ export const plannerService = {
             throw new Error('Failed to fetch routines');
         }
 
-        return response.json();
+        const data = await response.json();
+        console.log('Raw API response:', JSON.stringify(data, null, 2));
+        
+        // Helper function to ensure time is in 12-hour format
+        const formatTimeForDisplay = (timeStr: string | undefined, defaultTime: string): string => {
+            if (!timeStr) return defaultTime;
+            
+            // If already in 12h format with AM/PM, return as is
+            if (timeStr.includes('AM') || timeStr.includes('PM')) {
+                return timeStr;
+            }
+            
+            // If in 24h format (e.g., "13:30"), convert to 12h
+            if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
+                const [hours, minutes] = timeStr.split(':');
+                const hoursNum = parseInt(hours, 10);
+                const period = hoursNum >= 12 ? 'PM' : 'AM';
+                const hours12 = hoursNum % 12 || 12;
+                return `${hours12}:${minutes} ${period}`;
+            }
+            
+            return defaultTime;
+        };
+        
+        // Transform data from backend to frontend format
+        const routines = data.map((routine: any) => {
+            // Use the time fields directly from the backend
+            const startTime = routine.time_of_day || '6:00 AM';
+            const endTime = routine.end_time || '10:00 AM';
+            
+            const routineData = {
+                id: routine.id || `temp-${Math.random().toString(36).substr(2, 9)}`,
+                title: routine.title || 'Untitled Routine',
+                startTime: formatTimeForDisplay(startTime, '6:00 AM'),
+                endTime: formatTimeForDisplay(endTime, '10:00 AM'),
+                duration: routine.duration || '4h',
+                nextRun: routine.next_run || '',
+                icon: routine.icon || 'FiActivity',
+                isWorkBlock: routine.is_work_block || routine.isWorkBlock || false,
+                isProtected: routine.is_protected || routine.isProtected || false,
+                canDelete: routine.can_delete !== false,
+                canEditTitle: routine.can_edit_title !== false,
+                canEditTime: routine.can_edit_time !== false
+            };
+            
+            console.log('Processed routine:', routineData);
+            return routineData;
+        });
+        
+        console.log('Final routines data:', routines);
+        return routines;
     },
 
     async createRoutine(routine: Omit<Routine, 'id'>): Promise<Routine> {
@@ -190,27 +242,81 @@ export const plannerService = {
     },
 
     async checkTimeConflicts(startTime: string, endTime: string, excludeId?: string): Promise<Routine[]> {
-        const params = new URLSearchParams({
-            start_time: startTime,
-            end_time: endTime,
-        });
+        try {
+            // Ensure times are properly formatted
+            const formatTime = (time: string): string => {
+                try {
+                    // Handle null/undefined/empty
+                    if (!time) return '';
+                    
+                    // Convert to string in case it's a number or other type
+                    const timeStr = String(time).trim();
+                    
+                    // If it's already in 24h format (HH:MM), return as is
+                    if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
+                        const [hours, minutes] = timeStr.split(':').map(Number);
+                        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                    }
+                    
+                    // Handle 12h format (h:mm AM/PM)
+                    if (timeStr.includes(' ')) {
+                        const [timePart, period] = timeStr.split(' ');
+                        if (!timePart || !period) return '';
+                        
+                        const [hoursStr, minutesStr = '00'] = timePart.split(':');
+                        let hours = parseInt(hoursStr, 10);
+                        const minutes = parseInt(minutesStr, 10) || 0;
+                        
+                        // Validate hours and minutes
+                        if (isNaN(hours) || hours < 1 || hours > 12) return '';
+                        if (minutes < 0 || minutes > 59) return '';
+                        
+                        // Convert to 24h format
+                        const periodUpper = period.toUpperCase();
+                        if (periodUpper === 'PM' && hours < 12) {
+                            hours += 12;
+                        } else if (periodUpper === 'AM' && hours === 12) {
+                            hours = 0;
+                        }
+                        
+                        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                    }
+                    
+                    return ''; // Return empty string for invalid formats
+                } catch (error) {
+                    console.error('Error formatting time:', error, 'Input:', time);
+                    return ''; // Return empty string on error
+                }
+            };
 
-        if (excludeId) {
-            params.append('exclude_id', excludeId);
-        }
+            const formattedStart = formatTime(startTime);
+            const formattedEnd = formatTime(endTime);
 
-        const response = await fetch(`${API_BASE_URL}/routines/check-conflicts?${params.toString()}`, {
-            headers: getHeaders(),
-        });
-
-        if (!response.ok) {
-            if (response.status === 401) {
-                authService.removeToken();
-                window.location.href = '/login';
+            if (!formattedStart || !formattedEnd) {
+                throw new Error('Invalid time format');
             }
-            throw new Error('Failed to check conflicts');
-        }
 
-        return response.json();
+            const params = new URLSearchParams({
+                start_time: formattedStart,
+                end_time: formattedEnd
+            });
+
+            if (excludeId) {
+                params.append('exclude_id', excludeId);
+            }
+
+            const response = await fetch(`${API_BASE_URL}/routines/check-conflicts?${params}`, {
+                headers: getHeaders(),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to check conflicts');
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error checking conflicts:', error);
+            throw error;
+        }
     },
 };

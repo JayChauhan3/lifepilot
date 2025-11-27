@@ -58,14 +58,36 @@ class RoutineService:
 
     async def get_routines(self, user_id: str) -> List[RoutineModel]:
         """Get all routines for a user. If none exist, create default routines."""
+        # Always ensure default routines (specifically Work Block) exist and are correct
+        # This handles migration and protection enforcement
+        await self.create_default_routines(user_id)
+        
+        # Now fetch all routines
         cursor = self.collection.find({"user_id": user_id}).sort("_time_of_day", 1)
         routines: List[RoutineModel] = []
+        
+        # Log the raw documents from the database
+        raw_docs = []
         async for doc in cursor:
-            routines.append(RoutineModel(**doc))
-
-        # Create default routines if none exist
-        if not routines:
-            routines = await self.create_default_routines(user_id)
+            raw_docs.append(doc)
+            
+        logger.info(f"Raw routines from database for user {user_id}:", 
+                  data=[{k: v for k, v in doc.items() if not k.startswith('_')} for doc in raw_docs])
+        
+        # Convert to models
+        for doc in raw_docs:
+            try:
+                routine = RoutineModel(**doc)
+                routines.append(routine)
+                logger.info(f"Converted routine {routine.id}:", 
+                          title=routine.title,
+                          time_of_day=routine.time_of_day,
+                          end_time=routine.end_time,
+                          _time_of_day=getattr(routine, '_time_of_day', None),
+                          _end_time=getattr(routine, '_end_time', None))
+            except Exception as e:
+                logger.error(f"Error creating RoutineModel from doc: {e}", doc=doc)
+                raise
 
         return routines
     async def update_routine(self, user_id: str, routine_id: str, updates: Dict[str, Any]) -> Optional[RoutineModel]:
@@ -169,7 +191,8 @@ class RoutineService:
         end_time: str,
         exclude_id: Optional[str] = None
     ) -> List[RoutineModel]:
-        """Find routines that overlap with the given time range
+        """
+        Find routines that overlap with the given time range
         
         Args:
             user_id: ID of the user
@@ -184,9 +207,20 @@ class RoutineService:
             ValueError: If time format is invalid
         """
         try:
+            # Validate input times
+            if not start_time or not end_time:
+                raise ValueError("Start time and end time are required")
+                
             # Normalize input times to 24h format
-            norm_start = normalize_time_to_24h(start_time)
-            norm_end = normalize_time_to_24h(end_time)
+            try:
+                norm_start = normalize_time_to_24h(start_time)
+                norm_end = normalize_time_to_24h(end_time)
+            except ValueError as e:
+                logger.warning("Invalid time format", 
+                             start_time=start_time, 
+                             end_time=end_time, 
+                             error=str(e))
+                raise ValueError(f"Invalid time format: {str(e)}")
             
             logger.debug("Checking for time conflicts", 
                         user_id=user_id,
@@ -198,7 +232,11 @@ class RoutineService:
             # Get all routines for the user
             query = {"user_id": user_id}
             if exclude_id:
-                query["_id"] = {"$ne": ObjectId(exclude_id)}
+                try:
+                    query["_id"] = {"$ne": ObjectId(exclude_id)}
+                except Exception as e:
+                    logger.warning("Invalid exclude_id", exclude_id=exclude_id, error=str(e))
+                    # Continue without the exclude_id if it's invalid
             
             cursor = self.collection.find(query)
             conflicts = []
@@ -207,12 +245,20 @@ class RoutineService:
                 try:
                     routine = RoutineModel(**doc)
                     # Skip if routine doesn't have valid times
+                    if not hasattr(routine, '_time_of_day') or not hasattr(routine, '_end_time'):
+                        continue
                     if not routine._time_of_day or not routine._end_time:
                         continue
                         
                     # Normalize routine times
-                    existing_start = normalize_time_to_24h(routine._time_of_day)
-                    existing_end = normalize_time_to_24h(routine._end_time)
+                    try:
+                        existing_start = normalize_time_to_24h(routine._time_of_day)
+                        existing_end = normalize_time_to_24h(routine._end_time)
+                    except ValueError as e:
+                        logger.warning("Skipping routine with invalid time format", 
+                                     routine_id=str(doc.get('_id', 'unknown')),
+                                     error=str(e))
+                        continue
                     
                     # Check for overlap
                     if times_overlap(norm_start, norm_end, existing_start, existing_end):
@@ -239,7 +285,8 @@ class RoutineService:
                         error=str(e),
                         user_id=user_id,
                         start_time=start_time,
-                        end_time=end_time)
+                        end_time=end_time,
+                        stack_info=True)
             raise ValueError(f"Error checking for time conflicts: {str(e)}")
 
 
