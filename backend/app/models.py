@@ -76,13 +76,12 @@ class RoutineModel(MongoBaseModel):
     title: str
     description: Optional[str] = None
     frequency: str = "daily"  # daily, weekly, monthly
-    time_of_day_24h: Optional[str] = None  # Internal storage in 24h format
-    end_time_24h: Optional[str] = None  # Internal storage in 24h format
+    startTime: Optional[str] = None  # Internal storage in 24h format (e.g. "09:00")
+    endTime: Optional[str] = None  # Internal storage in 24h format (e.g. "17:00")
     days_of_week: List[str] = []  # mon, tue, etc.
     is_active: bool = True
     
     # Display fields for frontend
-    icon: Optional[str] = None  # Icon identifier (e.g., "FiSun", "FiBriefcase")
     duration: Optional[str] = None  # Will be auto-calculated
     is_work_block: bool = False  # Identifies work block routines
     
@@ -105,54 +104,42 @@ class RoutineModel(MongoBaseModel):
     @model_validator(mode='before')
     @classmethod
     def convert_time_fields(cls, data: Any) -> Any:
-        """Convert time_of_day and end_time from 12h to 24h format before validation"""
+        """Convert time fields from 12h to 24h format before validation if needed"""
         if isinstance(data, dict):
-            # Handle time_of_day conversion
-            if 'time_of_day' in data and data['time_of_day']:
-                data['time_of_day_24h'] = _to_24h(data['time_of_day'])
+            # Handle startTime conversion
+            if 'startTime' in data and data['startTime']:
+                # If it looks like 12h format (has AM/PM or space), convert it
+                if ' ' in data['startTime'] or 'M' in data['startTime'].upper():
+                    data['startTime'] = _to_24h(data['startTime'])
+            elif 'time_of_day' in data and data['time_of_day']:
+                # Handle legacy field input
+                data['startTime'] = _to_24h(data['time_of_day'])
                 del data['time_of_day']
-            elif 'startTime' in data and data['startTime'] and 'time_of_day_24h' not in data:
-                data['time_of_day_24h'] = _to_24h(data['startTime'])
             
-            # Handle end_time conversion
-            if 'end_time' in data and data['end_time']:
-                data['end_time_24h'] = _to_24h(data['end_time'])
+            # Handle endTime conversion
+            if 'endTime' in data and data['endTime']:
+                # If it looks like 12h format (has AM/PM or space), convert it
+                if ' ' in data['endTime'] or 'M' in data['endTime'].upper():
+                    data['endTime'] = _to_24h(data['endTime'])
+            elif 'end_time' in data and data['end_time']:
+                # Handle legacy field input
+                data['endTime'] = _to_24h(data['end_time'])
                 del data['end_time']
-            elif 'endTime' in data and data['endTime'] and 'end_time_24h' not in data:
-                data['end_time_24h'] = _to_24h(data['endTime'])
         
         return data
     
-    @property
-    def time_of_day(self) -> Optional[str]:
-        """Get time in 12h format"""
-        return _to_12h(self.time_of_day_24h) if self.time_of_day_24h else None
-    
-    @property
-    def end_time(self) -> Optional[str]:
-        """Get end time in 12h format"""
-        return _to_12h(self.end_time_24h) if self.end_time_24h else None
-    
-    @property
-    def startTime(self) -> Optional[str]:
-        """Alias for time_of_day for frontend compatibility"""
-        return self.time_of_day
-    
-    @property
-    def endTime(self) -> Optional[str]:
-        """Alias for end_time for frontend compatibility"""
-        return self.end_time
+    # Removed legacy property accessors to ensure clean API response
 
     def calculate_duration(self) -> Optional[str]:
         """Calculate duration based on start and end times"""
-        if not self.time_of_day or not self.end_time:
+        if not self.startTime or not self.endTime:
             return None
             
         try:
-            # Parse start time
-            start_h, start_m = map(int, self.time_of_day.split(':'))
-            # Parse end time
-            end_h, end_m = map(int, self.end_time.split(':'))
+            # Parse start time (stored as 24h HH:MM)
+            start_h, start_m = map(int, self.startTime.split(':'))
+            # Parse end time (stored as 24h HH:MM)
+            end_h, end_m = map(int, self.endTime.split(':'))
             
             # Calculate total minutes
             total_minutes = (end_h * 60 + end_m) - (start_h * 60 + start_m)
@@ -172,18 +159,18 @@ class RoutineModel(MongoBaseModel):
         except (ValueError, IndexError):
             return None
 
+        return data
+    
     def model_dump(self, **kwargs):
         """Override to include computed properties and calculate duration"""
         # Use mode='python' to get all fields including private ones
         data = super().model_dump(mode='python', **kwargs)
         
         # Calculate duration if not set
-        if self.duration is None and self.time_of_day and self.end_time:
+        if self.duration is None and self.startTime and self.endTime:
             self.duration = self.calculate_duration()
         
         # Add computed properties
-        data['startTime'] = self.startTime
-        data['endTime'] = self.endTime
         data['nextRun'] = self.nextRun
         data['isWorkBlock'] = self.isWorkBlock
         data['duration'] = self.duration or self.calculate_duration()
@@ -193,12 +180,6 @@ class RoutineModel(MongoBaseModel):
         data['canDelete'] = self.can_delete
         data['canEditTitle'] = self.can_edit_title
         data['canEditTime'] = self.can_edit_time
-        
-        # Ensure internal time fields are preserved for database storage
-        if hasattr(self, 'time_of_day_24h'):
-            data['time_of_day_24h'] = self.time_of_day_24h
-        if hasattr(self, 'end_time_24h'):
-            data['end_time_24h'] = self.end_time_24h
         
         # Remove _id if it is None so Mongo generates it
         if "_id" in data and data["_id"] is None:
@@ -213,20 +194,15 @@ class RoutineModel(MongoBaseModel):
         return data
     
     @property
-    def startTime(self) -> Optional[str]:
-        """Alias for time_of_day for frontend compatibility"""
-        return self.time_of_day
-    
-    @property
     def nextRun(self) -> str:
         """Calculate next run time based on frequency and current time"""
         from datetime import datetime, timedelta
         
-        if not self.time_of_day_24h:
+        if not self.startTime:
             return "Not scheduled"
         
         now = datetime.now()
-        time_parts = self.time_of_day_24h.split(":")
+        time_parts = self.startTime.split(":")
         hour = int(time_parts[0])
         minute = int(time_parts[1]) if len(time_parts) > 1 else 0
         

@@ -117,20 +117,31 @@ export default function RoutinesView() {
         }
     };
 
-    const handleDeleteRoutine = async (id: string): Promise<void> => {
-        // Create a promise that resolves when the user confirms the deletion
-        return new Promise((resolve) => {
-            setConfirmConfig({
-                isOpen: true,
-                title: 'Delete Routine?',
-                message: 'Are you sure you want to delete this routine? This action cannot be undone.',
-                onConfirm: async () => {
-                    await deleteRoutine(id);
-                    resolve();
-                },
-                isDanger: true,
-            });
+    const [routineToDelete, setRoutineToDelete] = useState<Routine | null>(null);
+
+    const handleDeleteClick = (routine: Routine) => {
+        setRoutineToDelete(routine);
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Delete Routine?',
+            message: `Are you sure you want to delete "${routine.title}"? This action cannot be undone.`,
+            onConfirm: async () => {
+                if (routineToDelete) {
+                    try {
+                        await deleteRoutine(routineToDelete.id);
+                    } catch (error) {
+                        console.error('Error deleting routine:', error);
+                    } finally {
+                        setRoutineToDelete(null);
+                    }
+                }
+            },
+            isDanger: true,
         });
+    };
+
+    const handleDeleteRoutine = async (id: string): Promise<void> => {
+        return deleteRoutine(id);
     };
 
     // Helper function to convert time string to minutes for sorting
@@ -202,7 +213,8 @@ export default function RoutinesView() {
                                 routine={routine}
                                 index={index + 1}
                                 onEdit={() => handleEditRoutine(routine)}
-                                onDelete={() => handleDeleteRoutine(routine.id)}
+                                onDelete={handleDeleteRoutine}
+                                onDeleteClick={handleDeleteClick}
                             />
                         </motion.div>
                     )
@@ -213,7 +225,6 @@ export default function RoutinesView() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSave={handleSaveRoutine}
-                onDelete={handleDeleteRoutine}
                 initialData={editingRoutine}
             />
 
@@ -230,7 +241,19 @@ export default function RoutinesView() {
     );
 }
 
-function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, index: number, onEdit: () => void, onDelete: (id: string) => void }) {
+function RoutineCard({ 
+    routine, 
+    index, 
+    onEdit, 
+    onDelete, 
+    onDeleteClick 
+}: { 
+    routine: Routine; 
+    index: number; 
+    onEdit: () => void; 
+    onDelete: (id: string) => Promise<void>; 
+    onDeleteClick: (routine: Routine) => void; 
+}) {
     // Default times based on routine title
     const Icon = ICON_MAP[routine.icon || 'FiActivity'] || FiActivity;
 
@@ -281,8 +304,12 @@ function RoutineCard({ routine, index, onEdit, onDelete }: { routine: Routine, i
                         {/* Delete Button - Hide for Work Block */}
                         {!routine.isWorkBlock && (
                             <button
-                                onClick={() => onDelete(routine.id)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteClick(routine);
+                                }}
                                 className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                                title="Delete routine"
                             >
                                 <FiTrash2 size={16} />
                             </button>

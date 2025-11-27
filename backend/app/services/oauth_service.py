@@ -6,6 +6,7 @@ from app.core.database import get_database
 from app.models import UserModel
 from datetime import datetime
 import uuid
+from app.services.routine_service import RoutineService
 
 logger = structlog.get_logger()
 
@@ -23,6 +24,7 @@ oauth.register(
 class OAuthService:
     def __init__(self):
         self.collection_name = "users"
+        self.routine_service = RoutineService()
     
     @property
     def collection(self):
@@ -136,4 +138,11 @@ class OAuthService:
         created_doc = await self.collection.find_one({"user_id": user_id})
         logger.info("New OAuth user created", email=email, provider=oauth_provider)
         
+        # Create default routines for new OAuth user
+        try:
+            await self.routine_service.create_default_routines(user_id)
+            logger.info("Default routines created for new OAuth user", user_id=user_id)
+        except Exception as e:
+            logger.error("Failed to create default routines for OAuth user", user_id=user_id, error=str(e))
+
         return UserModel(**created_doc)

@@ -103,16 +103,16 @@ export const plannerService = {
 
         const data = await response.json();
         console.log('Raw API response:', JSON.stringify(data, null, 2));
-        
+
         // Helper function to ensure time is in 12-hour format
         const formatTimeForDisplay = (timeStr: string | undefined, defaultTime: string): string => {
             if (!timeStr) return defaultTime;
-            
+
             // If already in 12h format with AM/PM, return as is
             if (timeStr.includes('AM') || timeStr.includes('PM')) {
                 return timeStr;
             }
-            
+
             // If in 24h format (e.g., "13:30"), convert to 12h
             if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
                 const [hours, minutes] = timeStr.split(':');
@@ -121,35 +121,35 @@ export const plannerService = {
                 const hours12 = hoursNum % 12 || 12;
                 return `${hours12}:${minutes} ${period}`;
             }
-            
+
             return defaultTime;
         };
-        
+
         // Transform data from backend to frontend format
         const routines = data.map((routine: any) => {
-            // Use the time fields directly from the backend
-            const startTime = routine.time_of_day || '6:00 AM';
-            const endTime = routine.end_time || '10:00 AM';
-            
+            // Backend now sends startTime and endTime directly
+            const startTime = routine.startTime || '6:00 AM';
+            const endTime = routine.endTime || '10:00 AM';
+
             const routineData = {
                 id: routine.id || `temp-${Math.random().toString(36).substr(2, 9)}`,
                 title: routine.title || 'Untitled Routine',
                 startTime: formatTimeForDisplay(startTime, '6:00 AM'),
                 endTime: formatTimeForDisplay(endTime, '10:00 AM'),
                 duration: routine.duration || '4h',
-                nextRun: routine.next_run || '',
+                nextRun: routine.nextRun || routine.next_run || '',
                 icon: routine.icon || 'FiActivity',
                 isWorkBlock: routine.is_work_block || routine.isWorkBlock || false,
                 isProtected: routine.is_protected || routine.isProtected || false,
-                canDelete: routine.can_delete !== false,
-                canEditTitle: routine.can_edit_title !== false,
-                canEditTime: routine.can_edit_time !== false
+                canDelete: routine.can_delete !== false && routine.canDelete !== false,
+                canEditTitle: routine.can_edit_title !== false && routine.canEditTitle !== false,
+                canEditTime: routine.can_edit_time !== false && routine.canEditTime !== false
             };
-            
+
             console.log('Processed routine:', routineData);
             return routineData;
         });
-        
+
         console.log('Final routines data:', routines);
         return routines;
     },
@@ -158,8 +158,8 @@ export const plannerService = {
         // Transform frontend format to backend format
         const backendRoutine = {
             title: routine.title,
-            time_of_day: routine.startTime,
-            end_time: routine.endTime,
+            startTime: routine.startTime,
+            endTime: routine.endTime,
             duration: routine.duration,
             icon: routine.icon || 'FiActivity',
             is_work_block: routine.isWorkBlock || false,
@@ -194,8 +194,8 @@ export const plannerService = {
         const backendUpdates: any = {};
 
         if (updates.title !== undefined) backendUpdates.title = updates.title;
-        if (updates.startTime !== undefined) backendUpdates.time_of_day = updates.startTime;
-        if (updates.endTime !== undefined) backendUpdates.end_time = updates.endTime;
+        if (updates.startTime !== undefined) backendUpdates.startTime = updates.startTime;
+        if (updates.endTime !== undefined) backendUpdates.endTime = updates.endTime;
         if (updates.duration !== undefined) backendUpdates.duration = updates.duration;
         if (updates.icon !== undefined) backendUpdates.icon = updates.icon;
         if (updates.isWorkBlock !== undefined) backendUpdates.is_work_block = updates.isWorkBlock;
@@ -248,29 +248,29 @@ export const plannerService = {
                 try {
                     // Handle null/undefined/empty
                     if (!time) return '';
-                    
+
                     // Convert to string in case it's a number or other type
                     const timeStr = String(time).trim();
-                    
+
                     // If it's already in 24h format (HH:MM), return as is
                     if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
                         const [hours, minutes] = timeStr.split(':').map(Number);
                         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
                     }
-                    
+
                     // Handle 12h format (h:mm AM/PM)
                     if (timeStr.includes(' ')) {
                         const [timePart, period] = timeStr.split(' ');
                         if (!timePart || !period) return '';
-                        
+
                         const [hoursStr, minutesStr = '00'] = timePart.split(':');
                         let hours = parseInt(hoursStr, 10);
                         const minutes = parseInt(minutesStr, 10) || 0;
-                        
+
                         // Validate hours and minutes
                         if (isNaN(hours) || hours < 1 || hours > 12) return '';
                         if (minutes < 0 || minutes > 59) return '';
-                        
+
                         // Convert to 24h format
                         const periodUpper = period.toUpperCase();
                         if (periodUpper === 'PM' && hours < 12) {
@@ -278,10 +278,10 @@ export const plannerService = {
                         } else if (periodUpper === 'AM' && hours === 12) {
                             hours = 0;
                         }
-                        
+
                         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
                     }
-                    
+
                     return ''; // Return empty string for invalid formats
                 } catch (error) {
                     console.error('Error formatting time:', error, 'Input:', time);

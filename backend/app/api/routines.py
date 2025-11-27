@@ -14,12 +14,12 @@ class RoutineCreate(BaseModel):
     title: str
     description: Optional[str] = None
     frequency: str = "daily"
-    time_of_day: Optional[str] = None
+    startTime: Optional[str] = None
+    endTime: Optional[str] = None
     days_of_week: List[str] = []
     is_active: bool = True
     
     # Display fields
-    icon: Optional[str] = None  # Icon identifier (e.g., "FiSun", "FiBriefcase")
     duration: Optional[str] = None  # Display duration (e.g., "45m", "2h", "8h")
     is_work_block: bool = False  # Identifies work block routines
 
@@ -27,12 +27,12 @@ class RoutineUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     frequency: Optional[str] = None
-    time_of_day: Optional[str] = None
+    startTime: Optional[str] = None
+    endTime: Optional[str] = None
     days_of_week: Optional[List[str]] = None
     is_active: Optional[bool] = None
     
     # Display fields
-    icon: Optional[str] = None
     duration: Optional[str] = None
     is_work_block: Optional[bool] = None
 

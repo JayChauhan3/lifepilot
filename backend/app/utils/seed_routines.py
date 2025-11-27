@@ -13,8 +13,8 @@ def get_work_block_id(user_id: str) -> str:
 DEFAULT_ROUTINES = [
     {
         "title": "Morning Routine",
-        "time_of_day": "6:00 AM",
-        "end_time": "10:00 AM",
+        "startTime": "06:00",
+        "endTime": "10:00",
         "icon": "FiSun",
         "is_work_block": False,
         "is_protected": False,
@@ -25,8 +25,8 @@ DEFAULT_ROUTINES = [
     {
         "id": "placeholder", # Will be replaced dynamically
         "title": "Work Block",
-        "time_of_day": "10:00 AM",
-        "end_time": "5:00 PM",
+        "startTime": "10:00",
+        "endTime": "17:00",
         "icon": "FiBriefcase",
         "is_work_block": True,
         "is_protected": True,
@@ -36,8 +36,8 @@ DEFAULT_ROUTINES = [
     },
     {
         "title": "Evening Routine",
-        "time_of_day": "5:00 PM",
-        "end_time": "10:00 PM",
+        "startTime": "17:00",
+        "endTime": "22:00",
         "icon": "FiMoon",
         "is_work_block": False,
         "is_protected": False,
@@ -47,8 +47,8 @@ DEFAULT_ROUTINES = [
     },
     {
         "title": "Sleep",
-        "time_of_day": "10:00 PM",
-        "end_time": "6:00 AM",
+        "startTime": "22:00",
+        "endTime": "06:00",
         "icon": "FiMoon",
         "is_work_block": False,
         "is_protected": False,
@@ -97,8 +97,8 @@ async def seed_default_routines(user_id: str) -> List[RoutineModel]:
         if existing_to_migrate:
             logger.info("Migrating existing Work Block to user-specific protected ID", user_id=user_id)
             # Preserve existing times
-            default_work_data["time_of_day"] = existing_to_migrate.get("time_of_day") or existing_to_migrate.get("_time_of_day")
-            default_work_data["end_time"] = existing_to_migrate.get("end_time") or existing_to_migrate.get("_end_time")
+            default_work_data["startTime"] = existing_to_migrate.get("startTime") or existing_to_migrate.get("time_of_day") or existing_to_migrate.get("_time_of_day")
+            default_work_data["endTime"] = existing_to_migrate.get("endTime") or existing_to_migrate.get("end_time") or existing_to_migrate.get("_end_time")
             
             # Delete the old one
             await routines_collection.delete_one({"_id": existing_to_migrate["_id"]})

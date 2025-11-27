@@ -11,7 +11,7 @@ logger = structlog.get_logger()
 
 class Database:
     client: Optional[AsyncIOMotorClient] = None
-    db_name: str = "lifepilot_db"  # Default DB name
+    db_name: str = "lifepilot_test_db"  # Database name
     is_connected: bool = False  # Connection state tracking
 
 db = Database()

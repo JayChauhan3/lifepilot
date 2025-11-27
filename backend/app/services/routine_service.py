@@ -58,12 +58,10 @@ class RoutineService:
 
     async def get_routines(self, user_id: str) -> List[RoutineModel]:
         """Get all routines for a user. If none exist, create default routines."""
-        # Always ensure default routines (specifically Work Block) exist and are correct
-        # This handles migration and protection enforcement
-        await self.create_default_routines(user_id)
+        # Default routines are created on signup. We just fetch what exists.
         
         # Now fetch all routines
-        cursor = self.collection.find({"user_id": user_id}).sort("_time_of_day", 1)
+        cursor = self.collection.find({"user_id": user_id}).sort("startTime", 1)
         routines: List[RoutineModel] = []
         
         # Log the raw documents from the database
@@ -81,10 +79,8 @@ class RoutineService:
                 routines.append(routine)
                 logger.info(f"Converted routine {routine.id}:", 
                           title=routine.title,
-                          time_of_day=routine.time_of_day,
-                          end_time=routine.end_time,
-                          _time_of_day=getattr(routine, '_time_of_day', None),
-                          _end_time=getattr(routine, '_end_time', None))
+                          startTime=routine.startTime,
+                          endTime=routine.endTime)
             except Exception as e:
                 logger.error(f"Error creating RoutineModel from doc: {e}", doc=doc)
                 raise
@@ -105,14 +101,14 @@ class RoutineService:
             if updates["title"] != existing["title"]:
                 raise ValueError("Title cannot be changed for this routine")
                 
-        if existing.get("can_edit_time") is False and ("time_of_day" in updates or "end_time" in updates):
+        if existing.get("can_edit_time") is False and ("startTime" in updates or "endTime" in updates):
              # Check if times are actually changing
-             new_start = updates.get("time_of_day")
-             new_end = updates.get("end_time")
+             new_start = updates.get("startTime")
+             new_end = updates.get("endTime")
              
-             # Get existing times (handle both aliased and internal names)
-             old_start = existing.get("time_of_day") or existing.get("_time_of_day")
-             old_end = existing.get("end_time") or existing.get("_end_time")
+             # Get existing times
+             old_start = existing.get("startTime")
+             old_end = existing.get("endTime")
              
              # If times are changing, raise error
              if (new_start and new_start != old_start) or (new_end and new_end != old_end):
@@ -122,31 +118,26 @@ class RoutineService:
         temp_updates = {**existing, **updates}
         routine = RoutineModel(**temp_updates)
         
-        # Get the properly formatted data from the model (this converts time_of_day -> _time_of_day)
+        # Get the properly formatted data from the model
         formatted_updates = routine.model_dump(by_alias=True, exclude=["id", "_id", "created_at"])
         
         # Only include fields that were actually in the updates
         final_updates = {}
         for key in updates.keys():
-            # Map frontend field names to backend field names
-            if key == 'time_of_day' and '_time_of_day' in formatted_updates:
-                final_updates['_time_of_day'] = formatted_updates['_time_of_day']
-            elif key == 'end_time' and '_end_time' in formatted_updates:
-                final_updates['_end_time'] = formatted_updates['_end_time']
-            elif key in formatted_updates:
+            if key in formatted_updates:
                 final_updates[key] = formatted_updates[key]
         
         # Check for time conflicts if times are being updated
-        if 'time_of_day' in updates or 'end_time' in updates:
+        if 'startTime' in updates or 'endTime' in updates:
             # Get the updated time values, falling back to existing values if not in updates
-            time_of_day = updates.get('time_of_day', existing.get('time_of_day'))
-            end_time = updates.get('end_time', existing.get('end_time'))
+            start_time = updates.get('startTime', existing.get('startTime'))
+            end_time = updates.get('endTime', existing.get('endTime'))
             
             # If we have both time values, check for conflicts
-            if time_of_day and end_time:
+            if start_time and end_time:
                 try:
                     # Normalize times to 24h format for comparison
-                    norm_start = normalize_time_to_24h(time_of_day)
+                    norm_start = normalize_time_to_24h(start_time)
                     norm_end = normalize_time_to_24h(end_time)
                     
                     conflicts = await self.find_time_conflicts(
@@ -159,14 +150,14 @@ class RoutineService:
                         conflict_routine = conflicts[0]
                         raise ValueError(
                             f"Time conflict with '{conflict_routine.title}' "
-                            f"({conflict_routine.time_of_day} - {conflict_routine.end_time})"
+                            f"({conflict_routine.startTime} - {conflict_routine.endTime})"
                         )
                 except Exception as e:
                     logger.error("Error checking time conflicts", error=str(e))
                     raise ValueError("Invalid time format or conflict check failed")
         
         # Add calculated duration if times were updated
-        if 'time_of_day' in updates or 'end_time' in updates:
+        if 'startTime' in updates or 'endTime' in updates:
             final_updates['duration'] = routine.calculate_duration()
         
         # Update the updated_at timestamp
@@ -196,8 +187,8 @@ class RoutineService:
         
         Args:
             user_id: ID of the user
-            start_time: Start time in 24h format (e.g., '09:00' or '9:00 AM')
-            end_time: End time in 24h format (e.g., '17:00' or '5:00 PM')
+            start_time: Start time in 24h format (e.g., '09:00')
+            end_time: End time in 24h format (e.g., '17:00')
             exclude_id: Optional routine ID to exclude from conflict check
             
         Returns:
@@ -245,15 +236,13 @@ class RoutineService:
                 try:
                     routine = RoutineModel(**doc)
                     # Skip if routine doesn't have valid times
-                    if not hasattr(routine, '_time_of_day') or not hasattr(routine, '_end_time'):
-                        continue
-                    if not routine._time_of_day or not routine._end_time:
+                    if not routine.startTime or not routine.endTime:
                         continue
                         
                     # Normalize routine times
                     try:
-                        existing_start = normalize_time_to_24h(routine._time_of_day)
-                        existing_end = normalize_time_to_24h(routine._end_time)
+                        existing_start = normalize_time_to_24h(routine.startTime)
+                        existing_end = normalize_time_to_24h(routine.endTime)
                     except ValueError as e:
                         logger.warning("Skipping routine with invalid time format", 
                                      routine_id=str(doc.get('_id', 'unknown')),
@@ -266,7 +255,7 @@ class RoutineService:
                         logger.debug("Found time conflict", 
                                     routine_id=str(routine.id),
                                     routine_title=routine.title,
-                                    routine_times=f"{routine._time_of_day}-{routine._end_time}")
+                                    routine_times=f"{routine.startTime}-{routine.endTime}")
                         
                 except Exception as e:
                     logger.error("Error checking routine times", 
