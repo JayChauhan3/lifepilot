@@ -64,6 +64,7 @@ const TIMELINE_STYLES: Record<string, { dotBorder: string, dotText: string, dotB
 interface TimelineItem {
     id: string;
     time: string;
+    endTime?: string;
     title: string;
     type: string;
     icon?: any;
@@ -129,6 +130,7 @@ export default function TodayPlan() {
                 otherItems.push({
                     id: routine.id,
                     time: formatTime(routine.startTime),
+                    endTime: formatTime(routine.endTime),
                     title: routine.title,
                     type,
                     icon: Icon
@@ -155,6 +157,7 @@ export default function TodayPlan() {
             otherItems.push({
                 id: workRoutine.id,
                 time: formatTime(workRoutine.startTime),
+                endTime: formatTime(workRoutine.endTime),
                 title: workRoutine.title,
                 type: 'work',
                 icon: FiBriefcase,
@@ -219,7 +222,7 @@ export default function TodayPlan() {
                                             <div className="flex items-center gap-1.5 mt-0.5">
                                                 <FiClock className="text-gray-400" size={12} />
                                                 <span className="text-xs text-gray-500">
-                                                    {item.time}
+                                                    {item.time}{item.endTime && ` - ${item.endTime}`}
                                                 </span>
                                             </div>
                                         </div>
@@ -243,7 +246,7 @@ export default function TodayPlan() {
                                             )}
                                             <div className="space-y-1">
                                                 {item.subTasks.map((task, taskIndex) => (
-                                                    <div 
+                                                    <div
                                                         key={`task-${task.id || `task-${taskIndex}`}`}
                                                         className={clsx(
                                                             "flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded-lg border transition-colors",
@@ -293,17 +296,54 @@ export default function TodayPlan() {
 
 function formatTime(timeStr: string) {
     if (!timeStr) return "";
-    const [hour, min] = timeStr.split(':').map(Number);
-    const ampm = hour >= 12 ? 'pm' : 'am';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${min.toString().padStart(2, '0')} ${ampm}`;
+
+    // If already in 12h format, return as is
+    if (timeStr.includes('AM') || timeStr.includes('PM')) {
+        return timeStr;
+    }
+
+    const parts = timeStr.split(':');
+    if (parts.length !== 2) return timeStr; // Return as-is if invalid format
+
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+
+    // Check for NaN
+    if (isNaN(hours) || isNaN(minutes)) return timeStr;
+
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
+function calculateEndTime(startTime: string, duration: string): string {
+    if (!startTime || !duration) return startTime;
+
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const startTotalMins = startHour * 60 + startMin;
+
+    // Parse duration (e.g., "8h", "45m", "1h 30m")
+    let durationMins = 0;
+    const dur = duration.toLowerCase();
+    const hourMatch = dur.match(/(\d+)h/);
+    const minMatch = dur.match(/(\d+)m/);
+
+    if (hourMatch) durationMins += parseInt(hourMatch[1]) * 60;
+    if (minMatch) durationMins += parseInt(minMatch[1]);
+
+    const endTotalMins = startTotalMins + durationMins;
+    const endHour = Math.floor(endTotalMins / 60) % 24;
+    const endMin = endTotalMins % 60;
+
+    return `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
 }
 
 function parseTime(timeStr: string) {
-    // Convert "8:00 am" back to minutes for sorting
+    // Convert "8:00 AM" back to minutes for sorting
     const [time, modifier] = timeStr.split(' ');
     let [hours, minutes] = time.split(':').map(Number);
-    if (hours === 12 && modifier === 'am') hours = 0;
-    if (hours !== 12 && modifier === 'pm') hours += 12;
+    if (hours === 12 && modifier?.toLowerCase() === 'am') hours = 0;
+    if (hours !== 12 && modifier?.toLowerCase() === 'pm') hours += 12;
     return hours * 60 + minutes;
 }
