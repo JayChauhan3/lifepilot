@@ -23,6 +23,7 @@ class TaskCreate(BaseModel):
     date: Optional[str] = None
     duration: str  # e.g. "30m", "1h"
     type: Optional[str] = "upcoming"
+    priority_index: Optional[int] = None
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
@@ -38,6 +39,10 @@ class TaskUpdate(BaseModel):
     date: Optional[str] = None
     duration: Optional[str] = None
     type: Optional[str] = None
+    priority_index: Optional[int] = None
+
+class TaskReorder(BaseModel):
+    task_ids: List[str]
 
 @router.post("/tasks", response_model=TaskModel)
 async def create_task(task: TaskCreate, current_user: UserModel = Depends(get_current_user)):
@@ -85,6 +90,19 @@ async def get_task(task_id: str, current_user: UserModel = Depends(get_current_u
         logger.error("Failed to get task", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.put("/tasks/reorder")
+async def reorder_tasks(
+    reorder_data: TaskReorder,
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Reorder tasks"""
+    try:
+        await task_service.reorder_tasks(current_user.user_id, reorder_data.task_ids)
+        return {"message": "Tasks reordered successfully"}
+    except Exception as e:
+        logger.error("Failed to reorder tasks", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.put("/tasks/{task_id}", response_model=TaskModel)
 async def update_task(
     task_id: str,
@@ -124,3 +142,5 @@ async def delete_task(task_id: str, current_user: UserModel = Depends(get_curren
     except Exception as e:
         logger.error("Failed to delete task", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
+
+

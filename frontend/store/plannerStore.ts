@@ -15,6 +15,7 @@ interface PlannerState {
     deleteTask: (id: string) => Promise<void>;
     deleteTasksByType: (type: TaskType) => Promise<void>; // For "Delete All" in a column
     toggleTaskCompletion: (id: string) => Promise<void>;
+    reorderTasks: (taskIds: string[]) => Promise<void>;
 
     fetchRoutines: () => Promise<void>;
     addRoutine: (routine: Omit<Routine, 'id'>) => Promise<void>;
@@ -95,11 +96,57 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         const task = get().tasks.find((t) => t.id === id);
         if (!task) return;
 
-        console.log('Toggling completion for task:', id, 'Current status:', task.isCompleted);
         const newIsCompleted = !task.isCompleted;
-        const newType = newIsCompleted ? 'done' : (task.date === new Date().toISOString().split('T')[0] ? 'today' : 'upcoming');
+        const newType = newIsCompleted ? 'done' : 'today'; // Default to today if unchecking
 
-        await get().updateTask(id, { isCompleted: newIsCompleted, type: newType });
+        // Optimistic update
+        set((state) => ({
+            tasks: state.tasks.map((t) =>
+                t.id === id ? { ...t, isCompleted: newIsCompleted, type: newType as TaskType } : t
+            ),
+        }));
+
+        try {
+            await plannerService.updateTask(id, { isCompleted: newIsCompleted, type: newType as TaskType });
+        } catch (error) {
+            // Revert on failure
+            set((state) => ({
+                tasks: state.tasks.map((t) => (t.id === id ? task : t)),
+                error: 'Failed to update task status',
+            }));
+        }
+    },
+
+    reorderTasks: async (taskIds) => {
+        console.log('Store: reorderTasks called with', taskIds);
+        // Optimistic update: Reorder tasks in state based on taskIds
+        set((state) => {
+            const taskMap = new Map(state.tasks.map(t => [t.id, t]));
+            const reorderedTasks = taskIds.map((id, index) => {
+                const task = taskMap.get(id);
+                if (task) {
+                    return { ...task, priorityIndex: index };
+                }
+                return null;
+            }).filter(Boolean) as Task[];
+
+            // Keep tasks that are NOT in the reordered list (e.g. other columns)
+            const otherTasks = state.tasks.filter(t => !taskIds.includes(t.id));
+
+            const newTasks = [...reorderedTasks, ...otherTasks];
+            console.log('Store: Optimistic update complete. New tasks count:', newTasks.length);
+            return { tasks: newTasks };
+        });
+
+        try {
+            await plannerService.reorderTasks(taskIds);
+            console.log('Store: Backend reorder success');
+        } catch (error) {
+            console.error('Store: Backend reorder failed', error);
+            set({ error: 'Failed to reorder tasks' });
+            // TODO: Revert state if needed, but fetchTasks usually refreshes it
+            get().fetchTasks();
+        }
     },
 
     fetchRoutines: async () => {

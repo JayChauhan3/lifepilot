@@ -2,6 +2,7 @@ import structlog
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from bson import ObjectId
+from pymongo import UpdateOne
 from app.core.database import get_database
 from app.models import TaskModel
 
@@ -75,3 +76,22 @@ class TaskService:
             return result.deleted_count > 0
         except Exception:
             return False
+
+    async def reorder_tasks(self, user_id: str, task_ids: List[str]) -> bool:
+        """Reorder tasks by updating priority_index"""
+        if not task_ids:
+            return True
+            
+        operations = []
+        for index, task_id in enumerate(task_ids):
+            operations.append(
+                UpdateOne(
+                    {"_id": ObjectId(task_id), "user_id": user_id},
+                    {"$set": {"priority_index": index}}
+                )
+            )
+            
+        if operations:
+            await self.collection.bulk_write(operations)
+            
+        return True

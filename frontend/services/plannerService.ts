@@ -31,7 +31,8 @@ export const plannerService = {
         // Map _id to id if needed
         return data.map((task: any) => ({
             ...task,
-            id: task.id || task._id || `temp-${Math.random().toString(36).substr(2, 9)}`
+            id: task.id || task._id || `temp-${Math.random().toString(36).substr(2, 9)}`,
+            priorityIndex: task.priorityIndex ?? task.priority_index
         }));
     },
 
@@ -50,7 +51,12 @@ export const plannerService = {
             throw new Error('Failed to create task');
         }
 
-        return response.json();
+        const data = await response.json();
+        return {
+            ...data,
+            id: data.id || data._id,
+            priorityIndex: data.priorityIndex ?? data.priority_index
+        };
     },
 
     async updateTask(id: string, updates: Partial<Task>): Promise<Task> {
@@ -68,7 +74,12 @@ export const plannerService = {
             throw new Error('Failed to update task');
         }
 
-        return response.json();
+        const data = await response.json();
+        return {
+            ...data,
+            id: data.id || data._id,
+            priorityIndex: data.priorityIndex ?? data.priority_index
+        };
     },
 
     async deleteTask(id: string): Promise<void> {
@@ -89,6 +100,22 @@ export const plannerService = {
     async deleteAllTasks(): Promise<void> {
         // TODO: Implement bulk delete endpoint
         return Promise.resolve();
+    },
+
+    async reorderTasks(taskIds: string[]): Promise<void> {
+        const response = await fetch(`${API_BASE_URL}/tasks/reorder`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify({ task_ids: taskIds }),
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                authService.removeToken();
+                window.location.href = '/login';
+            }
+            throw new Error('Failed to reorder tasks');
+        }
     },
 
     // Routine operations

@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiCalendar, FiClock, FiTag } from 'react-icons/fi';
 import clsx from 'clsx';
 import { Task, TaskType } from '../../types/planner';
+import { usePlannerStore } from '../../store/plannerStore';
+import { parseDurationToMinutes, calculateTotalDuration, formatDurationForDisplay } from '../../utils/durationUtils';
 
 interface TaskModalProps {
     isOpen: boolean;
@@ -22,6 +24,10 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
     const [minutes, setMinutes] = useState('');
     const [error, setError] = useState('');
     const [type, setType] = useState<TaskType>(defaultType);
+
+    // Access store for validation
+    const tasks = usePlannerStore((state) => state.tasks);
+    const routines = usePlannerStore((state) => state.routines);
 
     // Helper to get local date string YYYY-MM-DD
     const getLocalDate = () => {
@@ -43,19 +49,30 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                 const mMatch = dur.match(/(\d+)m/);
                 setHours(hMatch ? hMatch[1] : '');
                 setMinutes(mMatch ? mMatch[1] : '');
-                setError('');
                 setType(initialData.type);
             } else {
+                // Reset for new task
                 setTitle('');
                 setTags([]);
                 setAim('');
-                // Default date/time - Use LOCAL date
                 setDate(getLocalDate());
                 setHours('');
                 setMinutes('');
-                setError('');
                 setType(defaultType);
             }
+            setTagInput(''); // Always reset tag input
+            setError('');
+        } else {
+            // Reset all state when modal closes
+            setTitle('');
+            setTags([]);
+            setTagInput('');
+            setAim('');
+            setDate('');
+            setHours('');
+            setMinutes('');
+            setError('');
+            setType(defaultType);
         }
     }, [isOpen, initialData, defaultType]);
 
@@ -83,7 +100,6 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
         }
         setError('');
 
-
         const h = parseInt(hours || '0', 10);
         const m = parseInt(minutes || '0', 10);
 
@@ -95,13 +111,72 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
         if (!durStr) durStr = '0m';
 
         const localToday = getLocalDate();
+        const taskType = (type === 'done' ? 'done' : (date === localToday ? 'today' : 'upcoming')) as TaskType;
+
+        // Validate against Work Block duration for "today" tasks
+        if (taskType === 'today') {
+            // Find Work Block routine
+            const workBlock = routines.find(r => r.isWorkBlock || r.id?.startsWith('WORK_BLOCK_'));
+
+            console.log('Work Block found:', workBlock);
+            console.log('All routines:', routines);
+
+            if (workBlock) {
+                // Calculate Work Block duration in minutes
+                // Try to get duration from the duration field, or calculate from start/end times
+                let workBlockDuration = 0;
+
+                if (workBlock.duration) {
+                    workBlockDuration = parseDurationToMinutes(workBlock.duration);
+                } else if (workBlock.startTime && workBlock.endTime) {
+                    // Calculate duration from time range
+                    const [startHour, startMin] = workBlock.startTime.split(':').map(Number);
+                    const [endHour, endMin] = workBlock.endTime.split(':').map(Number);
+                    const startMinutes = startHour * 60 + startMin;
+                    const endMinutes = endHour * 60 + endMin;
+                    workBlockDuration = endMinutes - startMinutes;
+                }
+
+                console.log('Work Block duration (minutes):', workBlockDuration);
+
+                if (workBlockDuration > 0) {
+                    // Get all today's tasks (excluding the one being edited if applicable)
+                    const todayTasks = tasks.filter((t: Task) => t.type === 'today' && t.id !== initialData?.id);
+
+                    console.log('Today tasks:', todayTasks);
+
+                    // Calculate total duration of existing today tasks
+                    const existingDuration = calculateTotalDuration(todayTasks);
+
+                    console.log('Existing duration (minutes):', existingDuration);
+
+                    // Add new task duration
+                    const newTaskDuration = parseDurationToMinutes(durStr);
+                    const totalDuration = existingDuration + newTaskDuration;
+
+                    console.log('New task duration (minutes):', newTaskDuration);
+                    console.log('Total duration (minutes):', totalDuration);
+
+                    // Check if exceeds Work Block
+                    if (totalDuration > workBlockDuration) {
+                        setError(
+                            `Your tasks need ${formatDurationForDisplay(totalDuration)} but Work Block has only ${formatDurationForDisplay(workBlockDuration)}. Increase Work Block duration or remove some tasks.`
+                        );
+                        return;
+                    }
+                }
+            } else {
+                console.warn('No Work Block routine found');
+            }
+        }
+
         const taskData = {
             title,
             tags,
             aim,
             date,
             duration: durStr,
-            type: (type === 'done' ? 'done' : (date === localToday ? 'today' : 'upcoming')) as TaskType,
+            type: taskType,
             isCompleted: type === 'done',
         };
         onSave(taskData);
@@ -110,6 +185,9 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
 
     // Lock date if it's a "Today" task (or intended to be)
     const isDateLocked = type === 'today';
+
+    // Read-only mode for completed tasks
+    const isReadOnly = initialData?.isCompleted === true || initialData?.type === 'done';
 
     return (
         <AnimatePresence>
@@ -130,9 +208,9 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                     >
                         <div className="p-6">
                             <div className="flex items-center justify-between mb-6">
-                                <h2 className="text-lg font-bold text-gray-900">
-                                    {initialData ? 'Edit Task' : 'Add New Task'}
-                                </h2>
+                                <h3 className="text-xl font-bold text-gray-900">
+                                    {isReadOnly ? 'View Task' : (initialData ? 'Edit Task' : 'New Task')}
+                                </h3>
                                 <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
                                     <FiX size={20} />
                                 </button>
@@ -146,9 +224,10 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                         type="text"
                                         value={title}
                                         onChange={(e) => setTitle(e.target.value)}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900"
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900 disabled:bg-gray-50 disabled:cursor-not-allowed"
                                         placeholder="What needs to be done?"
                                         required
+                                        disabled={isReadOnly}
                                     />
                                 </div>
 
@@ -159,23 +238,27 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                         {tags.map(tag => (
                                             <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-100 text-gray-600 text-xs font-medium">
                                                 {tag}
-                                                <button type="button" onClick={() => removeTag(tag)} className="hover:text-red-500">
-                                                    <FiX size={12} />
-                                                </button>
+                                                {!isReadOnly && (
+                                                    <button type="button" onClick={() => removeTag(tag)} className="hover:text-red-500">
+                                                        <FiX size={12} />
+                                                    </button>
+                                                )}
                                             </span>
                                         ))}
                                     </div>
-                                    <div className="relative">
-                                        <FiTag className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                                        <input
-                                            type="text"
-                                            value={tagInput}
-                                            onChange={(e) => setTagInput(e.target.value)}
-                                            onKeyDown={handleAddTag}
-                                            className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all"
-                                            placeholder="Add tag and press Enter"
-                                        />
-                                    </div>
+                                    {!isReadOnly && (
+                                        <div className="relative">
+                                            <FiTag className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                            <input
+                                                type="text"
+                                                value={tagInput}
+                                                onChange={(e) => setTagInput(e.target.value)}
+                                                onKeyDown={handleAddTag}
+                                                className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900"
+                                                placeholder="Add tag and press Enter"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Aim */}
@@ -185,8 +268,9 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                         value={aim}
                                         onChange={(e) => setAim(e.target.value)}
                                         rows={3}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all resize-none text-black"
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all resize-none text-black disabled:bg-gray-50 disabled:cursor-not-allowed"
                                         placeholder="Describe the goal of this task..."
+                                        disabled={isReadOnly}
                                     />
                                 </div>
 
@@ -200,16 +284,15 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                                 type="date"
                                                 value={date}
                                                 onChange={(e) => setDate(e.target.value)}
-                                                disabled={isDateLocked && !initialData} // Lock only if creating new Today task, allow edit if needed or logic dictates
-                                                // Actually requirement says: "For Today box -> date picker locked to today"
-                                                // So if type === 'today', we should lock it or force it to today.
+                                                disabled={isDateLocked && !initialData || isReadOnly}
                                                 readOnly={type === 'today'}
                                                 className={clsx(
                                                     "w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 outline-none transition-all",
-                                                    type === 'today'
+                                                    (isDateLocked || isReadOnly)
                                                         ? "bg-gray-50 text-gray-500 cursor-not-allowed"
                                                         : "focus:border-primary-500 focus:ring-2 focus:ring-primary-200 text-gray-900"
                                                 )}
+                                                required
                                             />
                                         </div>
                                     </div>
@@ -222,8 +305,9 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                                     min="0"
                                                     value={hours}
                                                     onChange={(e) => setHours(e.target.value)}
-                                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900"
+                                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900 disabled:bg-gray-50 disabled:cursor-not-allowed"
                                                     placeholder="Hrs"
+                                                    disabled={isReadOnly}
                                                 />
                                             </div>
                                             <div className="relative flex-1">
@@ -233,8 +317,9 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                                     max="59"
                                                     value={minutes}
                                                     onChange={(e) => setMinutes(e.target.value)}
-                                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900"
+                                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900 disabled:bg-gray-50 disabled:cursor-not-allowed"
                                                     placeholder="Min"
+                                                    disabled={isReadOnly}
                                                 />
                                             </div>
                                         </div>
@@ -244,19 +329,31 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
 
                                 {/* Actions */}
                                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-50">
-                                    <button
-                                        type="button"
-                                        onClick={onClose}
-                                        className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-xl shadow-sm shadow-primary-200 transition-all active:scale-95"
-                                    >
-                                        {initialData ? 'Update' : 'Save'}
-                                    </button>
+                                    {isReadOnly ? (
+                                        <button
+                                            type="button"
+                                            onClick={onClose}
+                                            className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-xl shadow-sm transition-all active:scale-95"
+                                        >
+                                            Close
+                                        </button>
+                                    ) : (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={onClose}
+                                                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-xl shadow-sm shadow-primary-200 transition-all active:scale-95"
+                                            >
+                                                {initialData ? 'Update' : 'Save'}
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </form>
                         </div>

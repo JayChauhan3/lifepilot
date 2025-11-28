@@ -9,6 +9,7 @@ export interface Task {
     duration: string; // e.g. "30m", "1h"
     isCompleted: boolean;
     type: TaskType;
+    priorityIndex?: number; // For drag-and-drop ordering
 }
 
 export interface Routine {

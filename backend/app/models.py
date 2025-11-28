@@ -37,6 +37,8 @@ class TaskModel(MongoBaseModel):
     date: Optional[str] = None  # YYYY-MM-DD
     duration: str  # e.g. "30m", "1h"
     type: str = "upcoming"  # today, upcoming, done
+    priority_index: Optional[int] = None  # For drag-and-drop ordering
+
 
 def _to_12h(time_str: str) -> str:
     """Convert 24h time string to 12h format"""
