@@ -250,7 +250,7 @@ function TaskCard({ task, index, isDone, onClick, onDelete, onCheckboxClick }: T
 
                 <div className="flex items-center gap-1 text-xs text-gray-400 shrink-0 ml-2">
                     <FiCalendar size={12} />
-                    <span>{task.time}</span>
+                    <span>{task.duration}</span>
                 </div>
             </div>
         </motion.div>

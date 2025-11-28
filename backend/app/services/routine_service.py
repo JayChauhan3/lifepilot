@@ -20,27 +20,34 @@ class RoutineService:
             raise RuntimeError("Database not initialized")
         return db[self.collection_name]
 
+    def _get_id_filter(self, routine_id: str) -> Dict[str, Any]:
+        """Create a MongoDB filter for ID that handles both ObjectId and string IDs"""
+        try:
+            return {"_id": ObjectId(routine_id)}
+        except Exception:
+            return {"_id": routine_id}
+
     async def create_routine(self, user_id: str, routine_data: Dict[str, Any]) -> RoutineModel:
         """Create a new routine"""
         # Create the routine model - the model will handle time formatting
         routine = RoutineModel(user_id=user_id, **routine_data)
         
         # Ensure duration is calculated before saving
-        if routine.duration is None and routine.time_of_day and routine.end_time:
+        if routine.duration is None and routine.startTime and routine.endTime:
             routine.duration = routine.calculate_duration()
         
         # Check for time conflicts
-        if routine._time_of_day and routine._end_time:
+        if routine.startTime and routine.endTime:
             conflicts = await self.find_time_conflicts(
                 user_id,
-                routine._time_of_day,
-                routine._end_time
+                routine.startTime,
+                routine.endTime
             )
             if conflicts:
                 conflict_routine = conflicts[0]
                 raise ValueError(
                     f"Time conflict with '{conflict_routine.title}' "
-                    f"({conflict_routine.time_of_day} - {conflict_routine.end_time})"
+                    f"({conflict_routine.startTime} - {conflict_routine.endTime})"
                 )
         
         # Prepare the data for database insertion
@@ -92,7 +99,8 @@ class RoutineService:
         updates.pop('user_id', None)
         
         # Get the existing routine to check for time changes
-        existing = await self.collection.find_one({"_id": ObjectId(routine_id), "user_id": user_id})
+        id_filter = self._get_id_filter(routine_id)
+        existing = await self.collection.find_one({**id_filter, "user_id": user_id})
         if not existing:
             return None
             
@@ -164,7 +172,7 @@ class RoutineService:
         final_updates['updated_at'] = datetime.utcnow()
         
         result = await self.collection.update_one(
-            {"_id": ObjectId(routine_id), "user_id": user_id},
+            {**id_filter, "user_id": user_id},
             {"$set": final_updates}
         )
         
@@ -172,7 +180,7 @@ class RoutineService:
             return None
             
         # Return the updated routine
-        updated_routine = await self.collection.find_one({"_id": ObjectId(routine_id)})
+        updated_routine = await self.collection.find_one({**id_filter, "user_id": user_id})
         return RoutineModel(**updated_routine)
     
     async def find_time_conflicts(
@@ -223,11 +231,12 @@ class RoutineService:
             # Get all routines for the user
             query = {"user_id": user_id}
             if exclude_id:
+                exclusions = [exclude_id]
                 try:
-                    query["_id"] = {"$ne": ObjectId(exclude_id)}
-                except Exception as e:
-                    logger.warning("Invalid exclude_id", exclude_id=exclude_id, error=str(e))
-                    # Continue without the exclude_id if it's invalid
+                    exclusions.append(ObjectId(exclude_id))
+                except Exception:
+                    pass
+                query["_id"] = {"$nin": exclusions}
             
             cursor = self.collection.find(query)
             conflicts = []
@@ -283,7 +292,8 @@ class RoutineService:
         """Delete a routine"""
         try:
             # Check if routine exists and can be deleted
-            routine = await self.collection.find_one({"_id": ObjectId(routine_id), "user_id": user_id})
+            id_filter = self._get_id_filter(routine_id)
+            routine = await self.collection.find_one({**id_filter, "user_id": user_id})
             if not routine:
                 return False
                 
@@ -292,7 +302,7 @@ class RoutineService:
                 logger.warning("Attempted to delete protected routine", routine_id=routine_id, user_id=user_id)
                 raise ValueError("This routine cannot be deleted")
                 
-            result = await self.collection.delete_one({"_id": ObjectId(routine_id), "user_id": user_id})
+            result = await self.collection.delete_one({**id_filter, "user_id": user_id})
             return result.deleted_count > 0
         except ValueError:
             raise

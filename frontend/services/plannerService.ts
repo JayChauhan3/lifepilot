@@ -26,7 +26,13 @@ export const plannerService = {
             throw new Error('Failed to fetch tasks');
         }
 
-        return response.json();
+        const data = await response.json();
+
+        // Map _id to id if needed
+        return data.map((task: any) => ({
+            ...task,
+            id: task.id || task._id || `temp-${Math.random().toString(36).substr(2, 9)}`
+        }));
     },
 
     async createTask(task: Omit<Task, 'id'>): Promise<Task> {
@@ -132,7 +138,7 @@ export const plannerService = {
             const endTime = routine.endTime || '10:00 AM';
 
             const routineData = {
-                id: routine.id || `temp-${Math.random().toString(36).substr(2, 9)}`,
+                id: routine.id || routine._id || `temp-${Math.random().toString(36).substr(2, 9)}`,
                 title: routine.title || 'Untitled Routine',
                 startTime: formatTimeForDisplay(startTime, '6:00 AM'),
                 endTime: formatTimeForDisplay(endTime, '10:00 AM'),
@@ -179,11 +185,9 @@ export const plannerService = {
                 authService.removeToken();
                 window.location.href = '/login';
             }
-            if (response.status === 409) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Time conflict detected');
-            }
-            throw new Error('Failed to create routine');
+
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || 'Failed to create routine');
         }
 
         return response.json();

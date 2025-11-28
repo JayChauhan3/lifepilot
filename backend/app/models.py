@@ -35,7 +35,7 @@ class TaskModel(MongoBaseModel):
     # Frontend compatibility fields
     aim: Optional[str] = None
     date: Optional[str] = None  # YYYY-MM-DD
-    time: Optional[str] = None  # HH:mm
+    duration: str  # e.g. "30m", "1h"
     type: str = "upcoming"  # today, upcoming, done
 
 def _to_12h(time_str: str) -> str:

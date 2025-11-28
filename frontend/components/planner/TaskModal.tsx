@@ -18,8 +18,17 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
     const [tagInput, setTagInput] = useState('');
     const [aim, setAim] = useState('');
     const [date, setDate] = useState('');
-    const [time, setTime] = useState('');
+    const [hours, setHours] = useState('');
+    const [minutes, setMinutes] = useState('');
+    const [error, setError] = useState('');
     const [type, setType] = useState<TaskType>(defaultType);
+
+    // Helper to get local date string YYYY-MM-DD
+    const getLocalDate = () => {
+        const d = new Date();
+        const offset = d.getTimezoneOffset() * 60000;
+        return new Date(d.getTime() - offset).toISOString().split('T')[0];
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -28,16 +37,23 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                 setTags(initialData.tags);
                 setAim(initialData.aim);
                 setDate(initialData.date);
-                setTime(initialData.time);
+                // Parse duration string (e.g., "1h 30m" or "45m")
+                const dur = initialData.duration || '';
+                const hMatch = dur.match(/(\d+)h/);
+                const mMatch = dur.match(/(\d+)m/);
+                setHours(hMatch ? hMatch[1] : '');
+                setMinutes(mMatch ? mMatch[1] : '');
+                setError('');
                 setType(initialData.type);
             } else {
                 setTitle('');
                 setTags([]);
                 setAim('');
-                // Default date/time
-                const now = new Date();
-                setDate(now.toISOString().split('T')[0]);
-                setTime(`${String(now.getHours()).padStart(2, '0')}:00`);
+                // Default date/time - Use LOCAL date
+                setDate(getLocalDate());
+                setHours('');
+                setMinutes('');
+                setError('');
                 setType(defaultType);
             }
         }
@@ -59,13 +75,33 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Validate duration
+        if (!hours && !minutes) {
+            setError('Please enter a duration');
+            return;
+        }
+        setError('');
+
+
+        const h = parseInt(hours || '0', 10);
+        const m = parseInt(minutes || '0', 10);
+
+        let durStr = '';
+        if (h > 0) durStr += `${h}h`;
+        if (m > 0) durStr += ` ${m}m`;
+        durStr = durStr.trim();
+
+        if (!durStr) durStr = '0m';
+
+        const localToday = getLocalDate();
         const taskData = {
             title,
             tags,
             aim,
             date,
-            time,
-            type: (type === 'done' ? 'done' : (date === new Date().toISOString().split('T')[0] ? 'today' : 'upcoming')) as TaskType,
+            duration: durStr,
+            type: (type === 'done' ? 'done' : (date === localToday ? 'today' : 'upcoming')) as TaskType,
             isCompleted: type === 'done',
         };
         onSave(taskData);
@@ -166,28 +202,43 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                                 onChange={(e) => setDate(e.target.value)}
                                                 disabled={isDateLocked && !initialData} // Lock only if creating new Today task, allow edit if needed or logic dictates
                                                 // Actually requirement says: "For Today box -> date picker locked to today"
-                                                // So if type is 'today', we should lock it or force it to today.
+                                                // So if type === 'today', we should lock it or force it to today.
                                                 readOnly={type === 'today'}
                                                 className={clsx(
                                                     "w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 outline-none transition-all",
-                                                    type === 'today' 
-                                                        ? "bg-gray-50 text-gray-500 cursor-not-allowed" 
+                                                    type === 'today'
+                                                        ? "bg-gray-50 text-gray-500 cursor-not-allowed"
                                                         : "focus:border-primary-500 focus:ring-2 focus:ring-primary-200 text-gray-900"
                                                 )}
                                             />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                                        <div className="relative">
-                                            <FiClock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                                            <input
-                                                type="time"
-                                                value={time}
-                                                onChange={(e) => setTime(e.target.value)}
-                                                className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900"
-                                            />
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Duration</label>
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={hours}
+                                                    onChange={(e) => setHours(e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900"
+                                                    placeholder="Hrs"
+                                                />
+                                            </div>
+                                            <div className="relative flex-1">
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="59"
+                                                    value={minutes}
+                                                    onChange={(e) => setMinutes(e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-gray-900"
+                                                    placeholder="Min"
+                                                />
+                                            </div>
                                         </div>
+                                        {error && <p className="text-red-500 text-xs mt-1 ml-1">{error}</p>}
                                     </div>
                                 </div>
 
@@ -209,9 +260,10 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                 </div>
                             </form>
                         </div>
-                    </motion.div>
+                    </motion.div >
                 </>
-            )}
-        </AnimatePresence>
+            )
+            }
+        </AnimatePresence >
     );
 }

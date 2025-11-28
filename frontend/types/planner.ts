@@ -6,7 +6,7 @@ export interface Task {
     tags: string[];
     aim: string;
     date: string; // YYYY-MM-DD
-    time: string; // HH:mm
+    duration: string; // e.g. "30m", "1h"
     isCompleted: boolean;
     type: TaskType;
 }

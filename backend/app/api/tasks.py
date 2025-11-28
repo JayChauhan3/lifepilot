@@ -21,7 +21,7 @@ class TaskCreate(BaseModel):
     # Frontend compatibility fields
     aim: Optional[str] = None
     date: Optional[str] = None
-    time: Optional[str] = None
+    duration: str  # e.g. "30m", "1h"
     type: Optional[str] = "upcoming"
 
 class TaskUpdate(BaseModel):
@@ -36,7 +36,7 @@ class TaskUpdate(BaseModel):
     # Frontend compatibility fields
     aim: Optional[str] = None
     date: Optional[str] = None
-    time: Optional[str] = None
+    duration: Optional[str] = None
     type: Optional[str] = None
 
 @router.post("/tasks", response_model=TaskModel)

@@ -27,7 +27,26 @@ const to12Hour = (time24: string): string => {
 
 // Helper to map icon string to component
 const ICON_MAP: Record<string, any> = {
-    FiSun, FiMoon, FiBriefcase, FiActivity, FiBook
+    FiSun, FiMoon, FiBriefcase, FiActivity, FiBook, FiCoffee, FiShoppingBag
+};
+
+// Helper to get icon based on routine title
+const getIconForRoutine = (title: string, currentIcon?: string) => {
+    // If a specific icon is saved and it's not the default, use it
+    if (currentIcon && currentIcon !== 'FiActivity' && ICON_MAP[currentIcon]) {
+        return ICON_MAP[currentIcon];
+    }
+
+    const lowerTitle = title.toLowerCase();
+    if (lowerTitle.includes('morning') || lowerTitle.includes('wake')) return FiSun;
+    if (lowerTitle.includes('sleep') || lowerTitle.includes('night') || lowerTitle.includes('bed')) return FiMoon;
+    if (lowerTitle.includes('work') || lowerTitle.includes('job') || lowerTitle.includes('meeting') || lowerTitle.includes('office')) return FiBriefcase;
+    if (lowerTitle.includes('gym') || lowerTitle.includes('workout') || lowerTitle.includes('exercise') || lowerTitle.includes('run') || lowerTitle.includes('health')) return FiActivity;
+    if (lowerTitle.includes('read') || lowerTitle.includes('study') || lowerTitle.includes('book') || lowerTitle.includes('learn')) return FiBook;
+    if (lowerTitle.includes('breakfast') || lowerTitle.includes('lunch') || lowerTitle.includes('dinner') || lowerTitle.includes('eat') || lowerTitle.includes('coffee') || lowerTitle.includes('meal')) return FiCoffee;
+    if (lowerTitle.includes('shop') || lowerTitle.includes('buy') || lowerTitle.includes('store') || lowerTitle.includes('grocer')) return FiShoppingBag;
+
+    return FiActivity;
 };
 
 // Static style map for routines (can be dynamic later)
@@ -66,6 +85,20 @@ const ROUTINE_STYLES: Record<string, { iconBg: string, iconColor: string, button
         buttonBg: "bg-rose-100",
         buttonText: "text-rose-700",
         gradient: "bg-rose-500"
+    },
+    food: {
+        iconBg: "bg-orange-100",
+        iconColor: "text-orange-600",
+        buttonBg: "bg-orange-100",
+        buttonText: "text-orange-700",
+        gradient: "bg-orange-500"
+    },
+    shopping: {
+        iconBg: "bg-purple-100",
+        iconColor: "text-purple-600",
+        buttonBg: "bg-purple-100",
+        buttonText: "text-purple-700",
+        gradient: "bg-purple-500"
     },
     default: {
         iconBg: "bg-gray-100",
@@ -109,117 +142,104 @@ export default function RoutinesView() {
         setIsModalOpen(true);
     };
 
-    const handleSaveRoutine = async (routineData: any) => {
-        if (editingRoutine) {
-            await updateRoutine(editingRoutine.id, routineData);
-        } else {
-            await addRoutine(routineData);
-        }
-    };
-
-    const [routineToDelete, setRoutineToDelete] = useState<Routine | null>(null);
-
     const handleDeleteClick = (routine: Routine) => {
-        setRoutineToDelete(routine);
         setConfirmConfig({
             isOpen: true,
-            title: 'Delete Routine?',
-            message: `Are you sure you want to delete "${routine.title}"? This action cannot be undone.`,
-            onConfirm: async () => {
-                if (routineToDelete) {
-                    try {
-                        await deleteRoutine(routineToDelete.id);
-                    } catch (error) {
-                        console.error('Error deleting routine:', error);
-                    } finally {
-                        setRoutineToDelete(null);
-                    }
-                }
-            },
+            title: 'Delete Routine',
+            message: `Are you sure you want to delete "${routine.title}"?`,
             isDanger: true,
+            onConfirm: () => handleDeleteRoutine(routine.id),
         });
     };
 
-    const handleDeleteRoutine = async (id: string): Promise<void> => {
-        return deleteRoutine(id);
+    const handleDeleteRoutine = async (id: string) => {
+        await deleteRoutine(id);
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
     };
 
-    // Helper function to convert time string to minutes for sorting
-    const timeToMinutes = (timeStr: string | undefined): number => {
-        if (!timeStr) return 0; // Default to midnight if no time
-
-        // Handle 12-hour format with AM/PM
-        if (timeStr.includes('AM') || timeStr.includes('PM')) {
-            const [time, period] = timeStr.split(' ');
-            let [hours, minutes] = time.split(':').map(Number);
-
-            if (period === 'PM' && hours !== 12) {
-                hours += 12;
-            } else if (period === 'AM' && hours === 12) {
-                hours = 0;
-            }
-
-            return hours * 60 + (minutes || 0);
+    const handleSaveRoutine = async (routineData: Partial<Routine>) => {
+        if (editingRoutine) {
+            await updateRoutine(editingRoutine.id, routineData);
+        } else {
+            await addRoutine(routineData as Omit<Routine, 'id'>);
         }
-
-        // Handle 24-hour format
-        const [hours, minutes] = timeStr.split(':').map(Number);
-        return hours * 60 + (minutes || 0);
+        // Refresh routines after save
+        fetchRoutines();
     };
 
-    // Sort routines by start time (morning first, sleep last)
+    // Sort routines by time
     const sortedRoutines = [...routines].sort((a, b) => {
-        const aTime = timeToMinutes(a.startTime);
-        const bTime = timeToMinutes(b.startTime);
-        return aTime - bTime;
+        // Helper to convert time string to minutes for comparison
+        const getMinutes = (timeStr: string) => {
+            if (!timeStr) return 0;
+            // Handle 12h format
+            if (timeStr.includes('AM') || timeStr.includes('PM')) {
+                const [time, period] = timeStr.split(' ');
+                let [hours, minutes] = time.split(':').map(Number);
+                if (period === 'PM' && hours !== 12) hours += 12;
+                if (period === 'AM' && hours === 12) hours = 0;
+                return hours * 60 + minutes;
+            }
+            // Handle 24h format
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours * 60 + minutes;
+        };
+
+        return getMinutes(a.startTime) - getMinutes(b.startTime);
     });
 
-    // Add layoutId for smooth animations when reordering
-    // Include index in the layout ID to ensure uniqueness during reordering
-    const getRoutineLayoutId = (id: string, index: number) => `routine-${id}-${index}`;
+    // Helper for layout ID to prevent animation glitches
+    const getRoutineLayoutId = (routineId: string) => {
+        return `routine-${routineId}`;
+    };
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Add New Routine Card - FIRST */}
-            <motion.button
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0 }}
-                onClick={handleAddRoutine}
-                className="flex flex-col items-center justify-center h-full min-h-[200px] rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/50 text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50/30 transition-all group"
-            >
-                <div className="w-12 h-12 rounded-full bg-white border border-gray-200 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
-                    <FiPlus size={24} />
+        <div className="h-full flex flex-col">
+            <div className="flex justify-between items-center mb-8">
+                <div>
+                    {/* <h1 className="text-2xl font-bold text-gray-900">Daily Routines</h1> */}
+                    {/* <p className="text-black text-lg dark:text-black">Manage your daily schedule and habits</p> */}
                 </div>
-                <span className="font-medium">Create New Routine</span>
-            </motion.button>
+                <button
+                    onClick={() => {
+                        setEditingRoutine(undefined);
+                        setIsModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md active:scale-95 transition-transform"
+                >
+                    <FiPlus />
+                    <span>New Routine</span>
+                </button>
+            </div>
 
-            {/* Routine Cards - Sorted from Morning to Night */}
-            <AnimatePresence mode="popLayout">
-                {sortedRoutines.map((routine, index) => {
-                    const layoutId = getRoutineLayoutId(routine.id, index);
-                    return (
-                        <motion.div
-                            key={layoutId}
-                            layoutId={layoutId}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ type: 'spring', stiffness: 500, damping: 50 }}
-                            className="h-full"
-                        >
-                            <RoutineCard
-                                routine={routine}
-                                index={index + 1}
-                                onEdit={() => handleEditRoutine(routine)}
-                                onDelete={handleDeleteRoutine}
-                                onDeleteClick={handleDeleteClick}
-                            />
-                        </motion.div>
-                    )
-                })}
-            </AnimatePresence>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
+
+
+                <AnimatePresence mode="popLayout">
+                    {sortedRoutines.map((routine, index) => {
+                        const layoutId = getRoutineLayoutId(routine.id);
+                        return (
+                            <motion.div
+                                key={layoutId}
+                                layoutId={layoutId}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{ type: 'spring', stiffness: 500, damping: 50 }}
+                                className="h-full"
+                            >
+                                <RoutineCard
+                                    routine={routine}
+                                    index={index + 1}
+                                    onEdit={() => handleEditRoutine(routine)}
+                                    onDelete={handleDeleteRoutine}
+                                    onDeleteClick={handleDeleteClick}
+                                />
+                            </motion.div>
+                        )
+                    })}
+                </AnimatePresence>
+            </div>
 
             <RoutineModal
                 isOpen={isModalOpen}
@@ -241,21 +261,21 @@ export default function RoutinesView() {
     );
 }
 
-function RoutineCard({ 
-    routine, 
-    index, 
-    onEdit, 
-    onDelete, 
-    onDeleteClick 
-}: { 
-    routine: Routine; 
-    index: number; 
-    onEdit: () => void; 
-    onDelete: (id: string) => Promise<void>; 
-    onDeleteClick: (routine: Routine) => void; 
+function RoutineCard({
+    routine,
+    index,
+    onEdit,
+    onDelete,
+    onDeleteClick
+}: {
+    routine: Routine;
+    index: number;
+    onEdit: () => void;
+    onDelete: (id: string) => Promise<void>;
+    onDeleteClick: (routine: Routine) => void;
 }) {
-    // Default times based on routine title
-    const Icon = ICON_MAP[routine.icon || 'FiActivity'] || FiActivity;
+    // Determine icon based on title
+    const Icon = getIconForRoutine(routine.title, routine.icon);
 
     // Determine style based on title keywords or default
     let styleKey = 'default';
@@ -265,6 +285,8 @@ function RoutineCard({
     else if (lowerTitle.includes('gym') || lowerTitle.includes('health') || lowerTitle.includes('workout')) styleKey = 'health';
     else if (lowerTitle.includes('evening') || lowerTitle.includes('night')) styleKey = 'evening';
     else if (lowerTitle.includes('read') || lowerTitle.includes('book')) styleKey = 'leisure';
+    else if (lowerTitle.includes('breakfast') || lowerTitle.includes('lunch') || lowerTitle.includes('dinner') || lowerTitle.includes('eat') || lowerTitle.includes('coffee')) styleKey = 'food';
+    else if (lowerTitle.includes('shop') || lowerTitle.includes('buy') || lowerTitle.includes('store')) styleKey = 'shopping';
 
     const styles = ROUTINE_STYLES[styleKey];
 
@@ -323,7 +345,7 @@ function RoutineCard({
                     <div className="flex items-center gap-1.5">
                         <FiClock size={14} />
                         <span>
-                            {routine.startTime ? to12Hour(routine.startTime) : '--:--'} - 
+                            {routine.startTime ? to12Hour(routine.startTime) : '--:--'} -
                             {routine.endTime ? to12Hour(routine.endTime) : '--:--'}
                         </span>
                     </div>

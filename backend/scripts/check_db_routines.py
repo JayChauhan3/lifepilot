@@ -4,10 +4,20 @@ Check MongoDB routines collection directly
 """
 from pymongo import MongoClient
 import json
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv('backend/.env')
 
 # Connect to MongoDB
-client = MongoClient('mongodb://localhost:27017/')
-db = client['lifepilot_test_db']  # Changed to correct database
+uri = os.getenv('MONGODB_URI')
+if not uri:
+    print("MONGODB_URI not found in .env")
+    exit(1)
+
+client = MongoClient(uri)
+db = client['lifepilot_test_db']  # Correct database name
 routines = db['routines']
 
 # Get all routines

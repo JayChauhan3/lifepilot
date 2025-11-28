@@ -199,7 +199,7 @@ export default function RoutineModal({
   existingRoutines = []
 }: RoutineModalProps) {
   const isEditing = !!initialData?.id;
-  const isWorkBlock = isDefaultWorkBlock || initialData?.id === WORK_BLOCK_ID;
+  const isWorkBlock = isDefaultWorkBlock || initialData?.id?.startsWith('WORK_BLOCK_') || initialData?.isWorkBlock === true;
 
   // Determine if this is a protected routine (default work block or other protected routines)
   const isProtected = isWorkBlock || initialData?.isProtected === true;
@@ -230,18 +230,11 @@ export default function RoutineModal({
 
         setDuration(initialData.duration || '');
       } else {
-        // For new routines, set default times based on the type
-        if (isDefaultWorkBlock || isWorkBlock) {
-          setTitle('Work Block');
-          setStartTime('10:00 AM');
-          setEndTime('5:00 PM');
-        } else {
-          // Default for new routines
-          setTitle('New Routine');
-          setStartTime('9:00 AM');
-          setEndTime('5:00 PM');
-        }
-        setDuration('8h');
+        // For new routines, start with empty fields (no defaults)
+        setTitle('');
+        setStartTime('');
+        setEndTime('');
+        setDuration('');
       }
       setError(null);
       setConflictError(null);
@@ -259,49 +252,7 @@ export default function RoutineModal({
     }
   }, [startTime, endTime]);
 
-  // Convert 12h time string to 24h format (e.g., '1:30 PM' -> '13:30')
-  const to24Hour = (time12h: string): string => {
-    if (!time12h) return '';
 
-    // If already in 24h format, return as is
-    if (/^\d{1,2}:\d{2}$/.test(time12h)) {
-      return time12h;
-    }
-
-    const [timePart, period] = time12h.split(' ');
-    if (!timePart || !period) return '';
-
-    let [hours, minutes] = timePart.split(':').map(Number);
-
-    if (period.toUpperCase() === 'PM' && hours < 12) {
-      hours += 12;
-    } else if (period.toUpperCase() === 'AM' && hours === 12) {
-      hours = 0;
-    }
-
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-  };
-
-  // Convert 24h time string to 12h format (e.g., '13:30' -> '1:30 PM')
-  const to12Hour = (time24: string): string => {
-    if (!time24) return '';
-
-    const [hours, minutes] = time24.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const hours12 = hours % 12 || 12;
-
-    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
-  };
-
-  // Format time for time input (HH:MM)
-  const formatForTimeInput = (time12: string): string => {
-    return to24Hour(time12) || '';
-  };
-
-  // Parse time from time input (HH:MM) to 12h format
-  const parseFromTimeInput = (time24: string): string => {
-    return to12Hour(time24) || '';
-  };
 
   // Calculate duration between two times
   const calculateDuration = (start: string, end: string): string => {
@@ -337,38 +288,20 @@ export default function RoutineModal({
   };
   // Check for time conflicts with other routines
   const checkForConflicts = useCallback(async () => {
-    if (!startTime || !endTime || !title.trim()) {
+    // Only check if both times are set
+    if (!startTime || !endTime) {
+      setConflictError(null);
       return false;
     }
 
     try {
-      // Convert to 24h format for comparison
-      let start24h = startTime;
-      let end24h = endTime;
+      const start24h = to24Hour(startTime);
+      const end24h = to24Hour(endTime);
 
-      // If time includes AM/PM, convert to 24h format
-      if (startTime.includes(' ') || startTime.includes('AM') || startTime.includes('PM')) {
-        start24h = to24Hour(startTime);
-      }
-      if (endTime.includes(' ') || endTime.includes('AM') || endTime.includes('PM')) {
-        end24h = to24Hour(endTime);
-      }
-
-      // Ensure times are in HH:MM format
+      // Validate format
       if (!/^\d{1,2}:\d{2}$/.test(start24h) || !/^\d{1,2}:\d{2}$/.test(end24h)) {
-        setConflictError('Invalid time format');
-        return false;
-      }
-
-      if (!start24h || !end24h) {
-        setConflictError('Invalid time format');
-        return false;
-      }
-
-      // Check if end time is after start time
-      if (start24h >= end24h) {
-        setConflictError('End time must be after start time');
-        return false;
+        // Don't show error while typing, just return
+        return true;
       }
 
       // Check for conflicts with existing routines
@@ -380,23 +313,27 @@ export default function RoutineModal({
 
       if (conflicts.length > 0) {
         const conflictNames = conflicts.map(c => c.title).join(', ');
-        setConflictError(`This time conflicts with: ${conflictNames}`);
-        return false;
+        setConflictError(`Time conflicts with: ${conflictNames}`);
+        return true;
       }
 
       setConflictError(null);
       return false;
     } catch (error) {
-      console.error('Error checking for conflicts:', error);
-      return false;
+      console.error('Error checking conflicts:', error);
+      return true;
     }
-  }, [startTime, endTime, title, initialData?.id]);
+  }, [startTime, endTime, initialData?.id]);
 
-  // Check for conflicts when times change
+  // Debounced conflict checking
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen || !startTime || !endTime) return;
+
+    const timeoutId = setTimeout(() => {
       checkForConflicts();
-    }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
   }, [startTime, endTime, isOpen, checkForConflicts]);
 
   // Calculate duration when start or end time changes
@@ -455,9 +392,10 @@ export default function RoutineModal({
     const formattedStartTime = to24Hour(startTime);
     const formattedEndTime = to24Hour(endTime);
 
-    // Check for time conflicts
+    // Check for conflicts - AWAIT the result
     const hasConflicts = await checkForConflicts();
     if (hasConflicts) {
+      // Error is already set by checkForConflicts
       return;
     }
 
@@ -480,9 +418,9 @@ export default function RoutineModal({
 
       await onSave(routineData);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving routine:', error);
-      setError('Failed to save routine. Please try again.');
+      setError(error.message || 'Failed to save routine. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -523,10 +461,12 @@ export default function RoutineModal({
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Routine name"
+                    placeholder="e.g., Morning Routine"
                     disabled={!canEditTitle}
-                    className={`w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black placeholder-gray-500 ${!canEditTitle ? 'bg-gray-100 cursor-not-allowed text-gray-700' : ''
-                      }`}
+                    className={clsx(
+                      "w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black",
+                      !canEditTitle && "bg-gray-100 cursor-not-allowed text-gray-500"
+                    )}
                   />
                 </div>
 
@@ -538,8 +478,8 @@ export default function RoutineModal({
                     </label>
                     <input
                       type="time"
-                      value={to24Hour(startTime) || '09:00'}
-                      onChange={(e) => setStartTime(to12Hour(e.target.value) || '9:00 AM')}
+                      value={to24Hour(startTime)}
+                      onChange={(e) => setStartTime(to12Hour(e.target.value))}
                       className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                     />
                   </div>
@@ -549,8 +489,8 @@ export default function RoutineModal({
                     </label>
                     <input
                       type="time"
-                      value={to24Hour(endTime) || '17:00'}
-                      onChange={(e) => setEndTime(to12Hour(e.target.value) || '5:00 PM')}
+                      value={to24Hour(endTime)}
+                      onChange={(e) => setEndTime(to12Hour(e.target.value))}
                       className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                     />
                   </div>
@@ -561,30 +501,39 @@ export default function RoutineModal({
                   Duration: {duration || '0h 0m'}
                 </div>
 
-                {/* Error Message */}
-                {error && (
-                  <div className="text-red-500 text-sm mt-2">
-                    {error}
+                {/* Conflict Error Message */}
+                {conflictError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
+                    <FiAlertCircle className="text-red-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-red-700">{conflictError}</p>
                   </div>
                 )}
 
-                {/* Form Actions */}
-                <div className="flex space-x-3">
+                {/* Error Message */}
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
+                    <FiAlertCircle className="text-red-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-4 border-t">
                   <button
                     type="button"
                     onClick={onClose}
-                    disabled={isSubmitting}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting || !!conflictError}
-                    className={`px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${isSubmitting || conflictError
-                      ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
-                      }`}
+                    className={clsx(
+                      "px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm",
+                      isSubmitting || conflictError
+                        ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    )}
                   >
                     {isSubmitting ? 'Saving...' : (initialData ? 'Update' : 'Save')}
                   </button>
