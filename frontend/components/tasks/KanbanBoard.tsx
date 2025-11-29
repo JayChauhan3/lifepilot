@@ -20,7 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiPlus, FiMoreHorizontal, FiCalendar, FiTrash2, FiCheckCircle, FiSquare } from "react-icons/fi";
+import { FiPlus, FiMoreHorizontal, FiCalendar, FiTrash2, FiCheckCircle, FiSquare, FiX } from "react-icons/fi";
 import clsx from "clsx";
 import { usePlannerStore } from "../../store/plannerStore";
 import { Task, TaskType } from "../../types/planner";
@@ -72,6 +72,8 @@ export default function KanbanBoard() {
         deleteTasksByType,
         toggleTaskCompletion,
         reorderTasks,
+        syncTasks,
+        workBlockWarning,
         isLoading
     } = usePlannerStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -95,7 +97,8 @@ export default function KanbanBoard() {
     useEffect(() => {
         fetchTasks();
         fetchRoutines();
-    }, [fetchTasks, fetchRoutines]);
+        syncTasks(); // Sync on mount
+    }, [fetchTasks, fetchRoutines, syncTasks]);
 
     const handleAddTask = (type: TaskType) => {
         setEditingTask(undefined);
@@ -199,6 +202,20 @@ export default function KanbanBoard() {
                     </button>
                 </div>
             </div>
+
+            {/* Work Block Warning Banner */}
+            {workBlockWarning && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
+                    <span className="text-red-600 text-sm font-medium">⚠️</span>
+                    <p className="text-red-700 text-sm flex-1">{workBlockWarning}</p>
+                    <button
+                        onClick={() => usePlannerStore.setState({ workBlockWarning: null })}
+                        className="text-red-400 hover:text-red-600"
+                    >
+                        <FiX size={16} />
+                    </button>
+                </div>
+            )}
 
             <DndContext
                 sensors={sensors}
@@ -310,6 +327,9 @@ interface TaskCardProps {
 }
 
 function TaskCard({ task, index, isDone, onClick, onDelete, onCheckboxClick }: TaskCardProps) {
+    const isUnfinished = task.type === 'unfinished';
+    const isReadOnly = isDone || isUnfinished;
+
     return (
         <motion.div
             layout
@@ -317,10 +337,12 @@ function TaskCard({ task, index, isDone, onClick, onDelete, onCheckboxClick }: T
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ delay: index * 0.05 }}
-            onClick={onClick}
+            onClick={isReadOnly ? undefined : onClick}
             className={clsx(
-                "bg-white p-4 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group relative",
-                isDone ? "border-gray-100 opacity-60 bg-gray-50" : "border-gray-100 hover:border-primary-200"
+                "bg-white p-4 rounded-xl border shadow-sm transition-all duration-200 group relative",
+                isUnfinished && "border-amber-200 bg-amber-50/30 opacity-75 cursor-default",
+                isDone && "border-gray-100 opacity-60 bg-gray-50 cursor-default",
+                !isReadOnly && "hover:shadow-md cursor-pointer hover:border-primary-200"
             )}
         >
             <div className="flex items-start justify-between gap-3 mb-2">
@@ -343,20 +365,24 @@ function TaskCard({ task, index, isDone, onClick, onDelete, onCheckboxClick }: T
 
                     <h4 className={clsx(
                         "text-sm font-medium leading-snug",
-                        isDone ? "text-gray-500 line-through" : "text-gray-900 group-hover:text-primary-700"
+                        isUnfinished && "text-gray-600",
+                        isDone && "text-gray-500 line-through",
+                        !isReadOnly && "text-gray-900 group-hover:text-primary-700"
                     )}>
                         {task.title}
                     </h4>
                 </div>
 
                 {/* Delete Icon */}
-                <button
-                    onClick={onDelete}
-                    className="text-gray-300 hover:text-red-500 transition-colors p-1 -mr-1 opacity-0 group-hover:opacity-100"
-                    title="Delete Task"
-                >
-                    <FiTrash2 size={14} />
-                </button>
+                {!isReadOnly && (
+                    <button
+                        onClick={onDelete}
+                        className="text-gray-300 hover:text-red-500 transition-colors p-1 -mr-1 opacity-0 group-hover:opacity-100"
+                        title="Delete Task"
+                    >
+                        <FiTrash2 size={14} />
+                    </button>
+                )}
             </div>
 
             <div className={clsx(

@@ -18,6 +18,7 @@ from app.api.auth import router as auth_router
 from app.core.orchestrator import orchestrator
 from app.core.websocket_manager import notification_manager
 from app.core.database import connect_to_mongo, close_mongo_connection, get_connection_status
+from app.tasks.scheduler import start_scheduler, stop_scheduler
 from app.middleware import (
     global_exception_handler,
     http_exception_handler,
@@ -37,6 +38,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting LifePilot API application")
     await connect_to_mongo()
+    start_scheduler()  # Start task scheduler
     await orchestrator.start()
     
     yield
@@ -44,6 +46,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down LifePilot API application")
     await orchestrator.stop()
+    stop_scheduler()  # Stop task scheduler
     await close_mongo_connection()
 
 # Create FastAPI app

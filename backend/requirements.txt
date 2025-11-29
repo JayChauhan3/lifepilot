@@ -37,6 +37,7 @@ pydantic==2.10.4
 pydantic-settings==2.7.0
 slowapi==0.1.9
 tenacity==8.2.3
+apscheduler==3.11.1
 
 # Authentication
 PyJWT==2.8.0

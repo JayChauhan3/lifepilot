@@ -143,4 +143,17 @@ async def delete_task(task_id: str, current_user: UserModel = Depends(get_curren
         logger.error("Failed to delete task", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/tasks/sync")
+async def sync_tasks(current_user: UserModel = Depends(get_current_user)):
+    """Manually trigger task state synchronization"""
+    try:
+        result = await task_service.sync_user_tasks(current_user.user_id)
+        
+        logger.info("Tasks synced manually", user_id=current_user.user_id, result=result)
+        return result
+    except Exception as e:
+        logger.error("Failed to sync tasks", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 

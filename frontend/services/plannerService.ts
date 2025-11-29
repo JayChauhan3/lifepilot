@@ -118,6 +118,23 @@ export const plannerService = {
         }
     },
 
+    async syncTasks(): Promise<{ success: boolean; warning?: boolean; message?: string }> {
+        const response = await fetch(`${API_BASE_URL}/tasks/sync`, {
+            method: 'POST',
+            headers: getHeaders(),
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                authService.removeToken();
+                window.location.href = '/login';
+            }
+            throw new Error('Failed to sync tasks');
+        }
+
+        return await response.json();
+    },
+
     // Routine operations
     async getRoutines(): Promise<Routine[]> {
         console.log('Fetching routines from:', `${API_BASE_URL}/routines`);

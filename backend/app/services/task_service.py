@@ -95,3 +95,13 @@ class TaskService:
             await self.collection.bulk_write(operations)
             
         return True
+
+    async def sync_user_tasks(self, user_id: str) -> Dict[str, Any]:
+        """
+        Sync task states - move upcoming to today and unchecked to unfinished
+        
+        Returns:
+            Sync results with warnings if any
+        """
+        from app.utils.task_transitions import sync_task_states
+        return await sync_task_states(user_id)

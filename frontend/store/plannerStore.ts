@@ -7,6 +7,7 @@ interface PlannerState {
     routines: Routine[];
     isLoading: boolean;
     error: string | null;
+    workBlockWarning: string | null;
 
     // Actions
     fetchTasks: () => Promise<void>;
@@ -16,6 +17,7 @@ interface PlannerState {
     deleteTasksByType: (type: TaskType) => Promise<void>; // For "Delete All" in a column
     toggleTaskCompletion: (id: string) => Promise<void>;
     reorderTasks: (taskIds: string[]) => Promise<void>;
+    syncTasks: () => Promise<void>;
 
     fetchRoutines: () => Promise<void>;
     addRoutine: (routine: Omit<Routine, 'id'>) => Promise<void>;
@@ -28,6 +30,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     routines: [],
     isLoading: false,
     error: null,
+    workBlockWarning: null,
 
     fetchTasks: async () => {
         set({ isLoading: true, error: null });
@@ -146,6 +149,25 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             set({ error: 'Failed to reorder tasks' });
             // TODO: Revert state if needed, but fetchTasks usually refreshes it
             get().fetchTasks();
+        }
+    },
+
+    syncTasks: async () => {
+        try {
+            const result = await plannerService.syncTasks();
+
+            // Set warning if capacity exceeded
+            if (result.warning) {
+                set({ workBlockWarning: result.message || null });
+            } else {
+                set({ workBlockWarning: null });
+            }
+
+            // Refresh tasks after sync
+            await get().fetchTasks();
+        } catch (error) {
+            console.error('Failed to sync tasks', error);
+            set({ error: 'Failed to sync tasks' });
         }
     },
 

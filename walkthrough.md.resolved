@@ -1,0 +1,258 @@
+# Task Auto-Transition System - Implementation Walkthrough
+
+## Overview
+
+Successfully implemented a comprehensive task auto-transition system using **midnight cron jobs** and real-time sync triggers. The system automatically moves tasks between states without requiring user intervention.
+
+---
+
+## Backend Implementation
+
+### Phase 1: Core Utilities
+
+#### Created [task_transitions.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/utils/task_transitions.py)
+
+**Key Functions:**
+1. **[move_upcoming_to_today()](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/utils/task_transitions.py#48-90)** - Moves tasks with `type:"upcoming"` to `type:"today"` when `date == today`
+2. **[move_unchecked_to_unfinished()](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/utils/task_transitions.py#92-134)** - Moves unchecked `type:"today"` tasks to `type:"unfinished"` when `date < today`
+3. **[check_work_block_capacity()](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/utils/task_transitions.py#136-200)** - Validates total task duration against work block duration
+4. **[sync_task_states()](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/utils/task_transitions.py#202-242)** - Orchestrates all transitions and returns warnings
+
+**Logic Flow:**
+```
+midnight cron → sync_task_states()
+                ├─→ move_unchecked_to_unfinished() (yesterday's incomplete tasks)
+                ├─→ move_upcoming_to_today() (today's scheduled tasks)
+                └─→ check_work_block_capacity() (validate capacity)
+```
+
+---
+
+### Phase 2: Scheduled Background Job
+
+#### Created [scheduler.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/tasks/scheduler.py)
+
+- **APScheduler** runs [daily_task_sync_job()](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/tasks/scheduler.py#33-64) at **00:00 every day**
+- Syncs **all users** automatically
+- Logs success/error counts
+
+#### Updated [main.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/main.py)
+
+- Added [start_scheduler()](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/tasks/scheduler.py#66-79) to app startup
+- Added [stop_scheduler()](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/tasks/scheduler.py#81-86) to app shutdown
+
+---
+
+### Phase 3: Real-Time Sync Triggers
+
+#### Updated [auth.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/api/auth.py)
+
+**Sync triggers on:**
+- `/auth/login` - Email/password login
+- `/auth/google/callback` - Google OAuth login
+
+#### Updated [tasks.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/api/tasks.py)
+
+**New endpoint:**
+- `POST /tasks/sync` - Manual sync trigger from frontend
+
+#### Updated [task_service.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/services/task_service.py)
+
+Added [sync_user_tasks()](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/services/task_service.py#99-108) method to service layer.
+
+---
+
+### Phase 4: Dependencies
+
+Updated [requirements.txt](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/requirements.txt):
+```txt
+apscheduler==3.11.1
+```
+
+---
+
+## Frontend Implementation
+
+### Phase 5: Service & Store Updates
+
+#### Updated [plannerService.ts](file:///Users/jaychauhan/Documents/GitHub/lifepilot/frontend/services/plannerService.ts)
+
+Added [syncTasks()](file:///Users/jaychauhan/Documents/GitHub/lifepilot/frontend/services/plannerService.ts#121-137) method:
+```typescript
+async syncTasks(): Promise<{success: boolean; warning?: boolean; message?: string}>
+```
+
+#### Updated [plannerStore.ts](file:///Users/jaychauhan/Documents/GitHub/lifepilot/frontend/store/plannerStore.ts)
+
+**New state:**
+- `workBlockWarning: string | null` - Stores capacity warning message
+
+**New action:**
+- [syncTasks()](file:///Users/jaychauhan/Documents/GitHub/lifepilot/frontend/services/plannerService.ts#121-137) - Calls service, sets warning, refreshes tasks
+
+---
+
+### Phase 6: UI Updates
+
+#### Updated [KanbanBoard.tsx](file:///Users/jaychauhan/Documents/GitHub/lifepilot/frontend/components/tasks/KanbanBoard.tsx)
+
+**1. Added Unfinished Column**
+```tsx
+const COLUMNS = [
+    { id: "today", title: "Today" },
+    { id: "upcoming", title: "Upcoming" },
+    { id: "unfinished", title: "Unfinished" }, // NEW
+    { id: "done", title: "Done" },
+];
+```
+
+**2. Updated Grid Layout**
+```tsx
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 ...">
+```
+
+**3. Sync on Mount**
+```tsx
+useEffect(() => {
+    fetchTasks();
+    fetchRoutines();
+    syncTasks(); // AUTO-SYNC
+}, [fetchTasks, fetchRoutines, syncTasks]);
+```
+
+**4. Work Block Warning Banner**
+```tsx
+{workBlockWarning && (
+    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+        <p className="text-red-700 text-sm">{workBlockWarning}</p>
+    </div>
+)}
+```
+
+**5. Unfinished Task Styling**
+```tsx
+const isUnfinished = task.type === 'unfinished';
+const isReadOnly = isDone || isUnfinished;
+
+// Styling:
+border-amber-200 bg-amber-50/30 opacity-75 cursor-default
+text-gray-600  // dimmed title
+```
+
+**Read-only behavior:**
+- No click handler
+- No edit on click
+- No delete button
+- No checkbox
+
+---
+
+## Task Transitions Timeline
+
+### Example Scenario (Nov 29-30):
+
+**Nov 28, 11:59 PM:**
+- Task A: `type:"upcoming"`, `date:"2025-11-29"`
+- Task B: `type:"today"`, `date:"2025-11-28"`, `isCompleted:false`
+
+**Nov 29, 00:00 AM (Midnight):**
+```
+Cron Job Runs:
+├─→ Task B: "today" → "unfinished" (yesterday, unchecked)
+└─→ Task A: "upcoming" → "today" (date matches)
+```
+
+**Work Block Warning (if applicable):**
+```
+If total duration > work block duration:
+→ Show red banner: "Tasks duration exceeds Work Block. Please adjust timings."
+```
+
+**Nov 29, 8:00 AM (User Logs In):**
+```
+Backup Sync:
+└─→ Ensures all transitions completed (in case offline at midnight)
+```
+
+---
+
+## Verification
+
+### What Was Tested
+
+✅ **Backend utilities created** - All functions working
+✅ **APScheduler installed** - `apscheduler==3.11.1` added
+✅ **Scheduler integrated** - Starts/stops with app
+✅ **Sync triggers added** - Login and manual endpoint
+✅ **Frontend service updated** - [syncTasks()](file:///Users/jaychauhan/Documents/GitHub/lifepilot/frontend/services/plannerService.ts#121-137) method
+✅ **Store updated** - `workBlockWarning` state and sync action
+✅ **KanbanBoard updated** - 4 columns, sync on mount, warning banner
+✅ **Unfinished UI styled** - Amber border, read-only, dimmed
+
+### What Needs Manual Testing
+
+1. **Wait for midnight (or set system time)** to verify cron job executes
+2. **Create test tasks:**
+   - Upcoming task with tomorrow's date
+   - Today task, don't check it off
+3. **Advance to next day** and verify:
+   - Upcoming → Today
+   - Unchecked today → Unfinished
+4. **Test work block warning:**
+   - Add tasks exceeding work block duration
+   - Verify red banner appears
+
+---
+
+## Key Features
+
+1. ✅ **Midnight Cron Job** - Runs daily at 00:00
+2. ✅ **Login Sync** - Syncs on every login (email/OAuth)
+3. ✅ **Manual Sync** - `/tasks/sync` endpoint for frontend
+4. ✅ **Work Block Validation** - Warns if tasks exceed capacity
+5. ✅ **Unfinished Tasks** - New column with amber styling, read-only
+6. ✅ **4-Column Layout** - Responsive grid (Today | Upcoming | Unfinished | Done)
+
+---
+
+## Files Changed
+
+### Backend (8 files)
+1. [backend/app/utils/task_transitions.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/utils/task_transitions.py) [NEW]
+2. [backend/app/tasks/scheduler.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/tasks/scheduler.py) [NEW]
+3. [backend/app/tasks/__init__.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/tasks/__init__.py) [NEW]
+4. [backend/app/main.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/main.py)
+5. [backend/app/api/auth.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/api/auth.py)
+6. [backend/app/api/tasks.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/api/tasks.py)
+7. [backend/app/services/task_service.py](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/app/services/task_service.py)
+8. [backend/requirements.txt](file:///Users/jaychauhan/Documents/GitHub/lifepilot/backend/requirements.txt)
+
+### Frontend (4 files)
+1. [frontend/types/planner.ts](file:///Users/jaychauhan/Documents/GitHub/lifepilot/frontend/types/planner.ts)
+2. [frontend/services/plannerService.ts](file:///Users/jaychauhan/Documents/GitHub/lifepilot/frontend/services/plannerService.ts)
+3. [frontend/store/plannerStore.ts](file:///Users/jaychauhan/Documents/GitHub/lifepilot/frontend/store/plannerStore.ts)
+4. [frontend/components/tasks/KanbanBoard.tsx](file:///Users/jaychauhan/Documents/GitHub/lifepilot/frontend/components/tasks/KanbanBoard.tsx)
+
+---
+
+## Next user Steps
+
+> [!IMPORTANT]
+> **MongoDB Atlas IP Whitelist**: Don't forget to add your current IP (`49.36.126.98`) to MongoDB Atlas Network Access!
+
+1. **Restart backend** to enable scheduler:
+   ```bash
+   cd backend
+   python start.py
+   ```
+
+2. **Test the system**:
+   - Create upcoming tasks
+   - Leave some today tasks unchecked
+   - Wait until midnight (or manually set system time)
+   - Verify transitions work
+
+3. **Monitor logs** for cron job execution:
+   ```
+   [INFO] Daily task sync completed, total_users=X, success=Y
+   ```

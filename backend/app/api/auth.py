@@ -94,6 +94,10 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         # Create access token
         access_token = create_access_token(data={"sub": user.user_id})
         
+        # Sync task states on login
+        from app.utils.task_transitions import sync_task_states
+        await sync_task_states(user.user_id)
+        
         logger.info("User logged in", user_id=user.user_id)
         
         return Token(access_token=access_token, token_type="bearer")
@@ -207,6 +211,10 @@ async def google_callback(request: Request):
         
         # Create JWT token
         access_token = create_access_token(data={"sub": user.user_id})
+        
+        # Sync task states on login
+        from app.utils.task_transitions import sync_task_states
+        await sync_task_states(user.user_id)
         
         # Redirect to frontend with token
         frontend_url = "http://localhost:3000"  # TODO: Get from config
