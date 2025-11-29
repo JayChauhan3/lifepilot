@@ -13,6 +13,7 @@ opentelemetry-instrumentation==0.59b0
 opentelemetry-instrumentation-fastapi==0.59b0
 opentelemetry-instrumentation-httpx==0.59b0
 opentelemetry-instrumentation-asyncpg==0.59b0
+email-validator>=2.1.0
 
 # Database and Storage
 asyncpg==0.30.0
@@ -42,6 +43,7 @@ PyJWT==2.8.0
 passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
 authlib==1.3.0
+itsdangerous>=2.1.2
 
 # HTTP Client (for health checks and external APIs)
 httpx==0.28.1

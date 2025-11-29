@@ -1,4 +1,4 @@
-export type TaskType = 'today' | 'upcoming' | 'done';
+export type TaskType = 'today' | 'upcoming' | 'done' | 'unfinished';
 
 export interface Task {
     id: string;

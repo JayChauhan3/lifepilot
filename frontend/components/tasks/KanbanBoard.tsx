@@ -57,6 +57,7 @@ function SortableTaskCard({ task, index, onClick, onCheckboxClick, onDelete }: a
 const COLUMNS: { id: TaskType; title: string }[] = [
     { id: "today", title: "Today" },
     { id: "upcoming", title: "Upcoming" },
+    { id: "unfinished", title: "Unfinished" },
     { id: "done", title: "Done" },
 ];
 
@@ -204,7 +205,7 @@ export default function KanbanBoard() {
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
             >
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full overflow-hidden">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 h-full overflow-hidden">
                     {COLUMNS.map(col => {
                         const columnTasks = tasks
                             .filter(t => t.type === col.id)
@@ -261,7 +262,7 @@ export default function KanbanBoard() {
                                             )}
                                         </AnimatePresence>
 
-                                        {col.id !== "done" && (
+                                        {col.id !== "done" && col.id !== "unfinished" && (
                                             <button
                                                 onClick={() => handleAddTask(col.id)}
                                                 className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 text-sm font-medium hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50/50 transition-all flex items-center justify-center gap-2"

@@ -10,6 +10,7 @@
     "start": "cd frontend && npm run start"
   },
   "devDependencies": {
+    "baseline-browser-mapping": "^2.8.32",
     "concurrently": "^8.2.0"
   },
   "dependencies": {

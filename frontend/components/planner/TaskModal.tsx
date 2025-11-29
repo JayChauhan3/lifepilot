@@ -36,6 +36,14 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
         return new Date(d.getTime() - offset).toISOString().split('T')[0];
     };
 
+    // Helper to get tomorrow's date string YYYY-MM-DD
+    const getTomorrowDate = () => {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        const offset = d.getTimezoneOffset() * 60000;
+        return new Date(d.getTime() - offset).toISOString().split('T')[0];
+    };
+
     useEffect(() => {
         if (isOpen) {
             if (initialData) {
@@ -55,7 +63,8 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                 setTitle('');
                 setTags([]);
                 setAim('');
-                setDate(getLocalDate());
+                // Set default date based on task type
+                setDate(defaultType === 'upcoming' ? getTomorrowDate() : getLocalDate());
                 setHours('');
                 setMinutes('');
                 setType(defaultType);
@@ -286,6 +295,7 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                                 onChange={(e) => setDate(e.target.value)}
                                                 disabled={isDateLocked && !initialData || isReadOnly}
                                                 readOnly={type === 'today'}
+                                                min={type === 'upcoming' && !initialData ? getTomorrowDate() : undefined}
                                                 className={clsx(
                                                     "w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 outline-none transition-all",
                                                     (isDateLocked || isReadOnly)

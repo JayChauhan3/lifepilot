@@ -11,11 +11,15 @@ next-env.d.ts
 # ------------------------------
 # PYTHON
 # ------------------------------
+venv/
 .venv/
+backend/venv/
 backend/.venv/
+**/venv/
+**/.venv/
+__pycache__/
 backend/__pycache__/
 backend/app/__pycache__/
-__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -68,7 +72,6 @@ backend/.pytest_cache/
 # ------------------------------
 build/
 dist/
-
 
 # Ignore ChromaDB data
 backend/data/*
