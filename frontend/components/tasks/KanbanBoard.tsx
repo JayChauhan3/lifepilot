@@ -20,11 +20,12 @@ import { CSS } from '@dnd-kit/utilities';
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiPlus, FiMoreHorizontal, FiCalendar, FiTrash2, FiCheckCircle, FiSquare, FiX } from "react-icons/fi";
+import { FiPlus, FiMoreHorizontal, FiCalendar, FiTrash2, FiCheckCircle, FiSquare, FiX, FiClock } from "react-icons/fi";
 import clsx from "clsx";
 import { usePlannerStore } from "../../store/plannerStore";
 import { Task, TaskType } from "../../types/planner";
 import TaskModal from "../planner/TaskModal";
+import HistoryModal from "./HistoryModal";
 import ConfirmationModal from "../planner/ConfirmationModal";
 
 function SortableTaskCard({ task, index, onClick, onCheckboxClick, onDelete }: any) {
@@ -77,6 +78,7 @@ export default function KanbanBoard() {
         isLoading
     } = usePlannerStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
     const [modalDefaultType, setModalDefaultType] = useState<TaskType>('today');
 
@@ -123,7 +125,7 @@ export default function KanbanBoard() {
         setConfirmConfig({
             isOpen: true,
             title: 'Delete All Tasks?',
-            message: `Are you sure you want to delete all tasks in ${type}? This action cannot be undone.`,
+            message: `Are you sure you want to delete all tasks in ${type}?`,
             onConfirm: () => deleteTasksByType(type),
             isDanger: true,
         });
@@ -194,6 +196,13 @@ export default function KanbanBoard() {
                 <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
                 <div className="flex gap-2">
                     <button
+                        onClick={() => setIsHistoryOpen(true)}
+                        className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium rounded-xl transition-all active:scale-95 flex items-center gap-2"
+                    >
+                        <FiClock size={16} />
+                        History
+                    </button>
+                    <button
                         onClick={() => handleAddTask('today')}
                         className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-xl shadow-sm shadow-primary-200 transition-all active:scale-95 flex items-center gap-2"
                     >
@@ -237,13 +246,29 @@ export default function KanbanBoard() {
                                             {columnTasks.length}
                                         </span>
                                     </div>
-                                    <button
-                                        onClick={() => handleDeleteAll(col.id)}
-                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                        title="Clear All"
-                                    >
-                                        <FiTrash2 size={14} />
-                                    </button>
+                                    <div className="relative group/delete">
+                                        <button
+                                            onClick={() => {
+                                                if (columnTasks.length > 0) {
+                                                    handleDeleteAll(col.id);
+                                                }
+                                            }}
+                                            className={clsx(
+                                                "p-1.5 rounded-lg transition-colors",
+                                                columnTasks.length > 0
+                                                    ? "text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                                    : "text-gray-300 cursor-not-allowed"
+                                            )}
+                                        >
+                                            <FiTrash2 size={14} />
+                                        </button>
+                                        {columnTasks.length === 0 && (
+                                            <div className="absolute right-0 top-full mt-2 w-32 px-2 py-1 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 invisible group-hover/delete:opacity-100 group-hover/delete:visible transition-all z-10 text-center">
+                                                No tasks available
+                                                <div className="absolute -top-1 right-2 w-2 h-2 bg-gray-800 rotate-45"></div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto px-3 pb-3 custom-scrollbar">
@@ -304,6 +329,11 @@ export default function KanbanBoard() {
                 defaultType={modalDefaultType}
             />
 
+            <HistoryModal
+                isOpen={isHistoryOpen}
+                onClose={() => setIsHistoryOpen(false)}
+            />
+
             <ConfirmationModal
                 isOpen={confirmConfig.isOpen}
                 onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
@@ -337,11 +367,11 @@ function TaskCard({ task, index, isDone, onClick, onDelete, onCheckboxClick }: T
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ delay: index * 0.05 }}
-            onClick={isReadOnly ? undefined : onClick}
+            onClick={onClick}
             className={clsx(
                 "bg-white p-4 rounded-xl border shadow-sm transition-all duration-200 group relative",
-                isUnfinished && "border-amber-200 bg-amber-50/30 opacity-75 cursor-default",
-                isDone && "border-gray-100 opacity-60 bg-gray-50 cursor-default",
+                isUnfinished && "border-amber-200 bg-amber-50/30 opacity-75 cursor-pointer hover:shadow-md hover:border-amber-300",
+                isDone && "border-gray-100 opacity-60 bg-gray-50 cursor-pointer hover:shadow-md hover:border-gray-200",
                 !isReadOnly && "hover:shadow-md cursor-pointer hover:border-primary-200"
             )}
         >
@@ -373,16 +403,15 @@ function TaskCard({ task, index, isDone, onClick, onDelete, onCheckboxClick }: T
                     </h4>
                 </div>
 
-                {/* Delete Icon */}
-                {!isReadOnly && (
-                    <button
-                        onClick={onDelete}
-                        className="text-gray-300 hover:text-red-500 transition-colors p-1 -mr-1 opacity-0 group-hover:opacity-100"
-                        title="Delete Task"
-                    >
-                        <FiTrash2 size={14} />
-                    </button>
-                )}
+
+                {/* Delete Icon - show for all tasks */}
+                <button
+                    onClick={onDelete}
+                    className="text-gray-300 hover:text-red-500 transition-colors p-1 -mr-1 opacity-0 group-hover:opacity-100"
+                    title="Delete Task"
+                >
+                    <FiTrash2 size={14} />
+                </button>
             </div>
 
             <div className={clsx(

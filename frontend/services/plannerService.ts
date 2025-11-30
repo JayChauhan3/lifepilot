@@ -36,6 +36,28 @@ export const plannerService = {
         }));
     },
 
+    async getTaskHistory(): Promise<Task[]> {
+        const response = await fetch(`${API_BASE_URL}/history/tasks`, {
+            headers: getHeaders(),
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                authService.removeToken();
+                window.location.href = '/login';
+            }
+            throw new Error('Failed to fetch task history');
+        }
+
+        const data = await response.json();
+
+        return data.map((task: any) => ({
+            ...task,
+            id: task.id || task._id,
+            priorityIndex: task.priorityIndex ?? task.priority_index
+        }));
+    },
+
     async createTask(task: Omit<Task, 'id'>): Promise<Task> {
         const response = await fetch(`${API_BASE_URL}/tasks`, {
             method: 'POST',
@@ -100,6 +122,43 @@ export const plannerService = {
     async deleteAllTasks(): Promise<void> {
         // TODO: Implement bulk delete endpoint
         return Promise.resolve();
+    },
+
+    async deleteTasksByType(type: string): Promise<void> {
+        const response = await fetch(`${API_BASE_URL}/tasks/type/${type}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                authService.removeToken();
+                window.location.href = '/login';
+            }
+            throw new Error('Failed to delete tasks');
+        }
+    },
+
+    async toggleTaskCompletion(id: string): Promise<Task> {
+        const response = await fetch(`${API_BASE_URL}/tasks/${id}/toggle`, {
+            method: 'POST',
+            headers: getHeaders(),
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                authService.removeToken();
+                window.location.href = '/login';
+            }
+            throw new Error('Failed to toggle task completion');
+        }
+
+        const data = await response.json();
+        return {
+            ...data,
+            id: data.id || data._id,
+            priorityIndex: data.priorityIndex ?? data.priority_index
+        };
     },
 
     async reorderTasks(taskIds: string[]): Promise<void> {
@@ -289,6 +348,24 @@ export const plannerService = {
         }
     },
 
+    async toggleRoutineCompletion(id: string, date: string): Promise<Routine> {
+        const response = await fetch(`${API_BASE_URL}/routines/${id}/toggle`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ date }),
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                authService.removeToken();
+                window.location.href = '/login';
+            }
+            throw new Error('Failed to toggle routine completion');
+        }
+
+        return response.json();
+    },
+
     async checkTimeConflicts(startTime: string, endTime: string, excludeId?: string): Promise<Routine[]> {
         try {
             // Ensure times are properly formatted
@@ -366,5 +443,27 @@ export const plannerService = {
             console.error('Error checking conflicts:', error);
             throw error;
         }
+    },
+
+    // Chat operation
+    async chat(message: string): Promise<any> {
+        // For now, use 'default' as user_id
+        // TODO: Get actual user_id from getCurrentUser() when needed
+        const userId = 'default';
+
+        const response = await fetch(`${API_BASE_URL}/chat`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+                user_id: userId,
+                message: message
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to send message');
+        }
+
+        return await response.json();
     },
 };

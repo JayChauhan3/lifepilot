@@ -49,84 +49,83 @@ class PlannerAgent:
                     product_info += f"- {product['name']}: ${product['price']}\n"
                 compacted_context += product_info
         
-        # Get chat history from session service
-        # Note: PlannerAgent doesn't have direct access to session_service instance in current init
-        # We'll need to instantiate it or pass it in. For now, let's instantiate it.
+        # Get chat history for context (if available)
         from ..core.session_service import SessionService
         session_service = SessionService()
-        # Assuming user_id is used to create session_id in a standard way, but we need the actual session_id
-        # Since we don't have it passed, we might miss history here. 
-        # Ideally RouterAgent should pass context.
-        # For now, we'll rely on the user_message being descriptive enough or the fallback being smarter.
+        session_id = session_service.get_active_session(user_id)
         
-        # Generate plan using LLM
+        logger.info("Session retrieved for planner", session_id=session_id, user_id=user_id)
+        
+        # Retrieve recent conversation history
+        chat_history = session_service.get_chat_history(session_id, limit=5)
+        
+        logger.info("Chat history retrieved", 
+                   session_id=session_id,
+                   history_count=len(chat_history),
+                   history_preview=[{" role": msg["role"], "content": msg["content"][:50]} for msg in chat_history[:2]])
+        
+        # Format conversation history for LLM context
+        conversation_context = ""
+        if chat_history:
+            conversation_context = "\n\nPrevious conversation:\n"
+            for msg in chat_history:
+                role = "User" if msg["role"] == "user" else "Assistant"
+                conversation_context += f"{role}: {msg['content']}\n"
+        
+        # Combine memory context with conversation history
+        full_context = compacted_context + conversation_context
+        
+        # Debug: Log the context being passed
+        logger.info("Context prepared for LLM", 
+                   memory_context_length=len(compacted_context), 
+                   conversation_context_length=len(conversation_context),
+                   full_context_preview=full_context[:300] if full_context else "No context")
+        
+        # Generate plan using the NEW strict LifePilot Planner persona
         try:
-            # Enhance prompt with instruction to ask for clarification
-            enhanced_context = f"{compacted_context}\n\nIMPORTANT: If the user request is vague (e.g. 'plan something'), return a plan with a single step: 'Ask for clarification on what to plan'."
+            logger.info("Generating plan with strict planner persona", user_message=user_message, has_conversation_history=bool(chat_history))
             
-            plan_data = self.llm_service.generate_plan(user_message, enhanced_context)
-            logger.info("Raw plan data from LLM", plan_data=str(plan_data)[:200])
+            # Use the new generate_planner_response method with full context
+            raw_response = self.llm_service.generate_planner_response(
+                user_message, 
+                full_context  # Now includes both memory and conversation history
+            )
             
-            # Extract steps from plan data
-            steps = []
-            if "steps" in plan_data:
-                for step in plan_data["steps"]:
-                    if isinstance(step, dict):
-                        steps.append(step.get("action", str(step)))
-                    else:
-                        steps.append(str(step))
-            else:
-                # If JSON parsing fails, try to extract steps from the raw response
-                response_text = str(plan_data)
-                # Split by lines and look for step-like content
-                lines = [line.strip() for line in response_text.split('\n') if line.strip()]
-                steps = []
-                for line in lines:
-                    # Skip lines that look like JSON structure
-                    if not any(char in line for char in ['{', '}', '[', ']', '"', ':']) and len(line) > 10:
-                        steps.append(line)
-                
-                # If no valid steps found, use Gemini to generate them directly
-                if not steps:
-                    fallback_response = self.llm_service.generate_text(
-                        f"Create 3-4 actionable steps for: {user_message}. If vague, ask for details.",
-                        max_tokens=300
-                    )
-                    steps = [step.strip() for step in fallback_response.split('\n') if step.strip() and len(step.strip()) > 5][:4]
-            # Create plan payload
+            logger.info("Plan generated successfully", response_length=len(raw_response))
+            
+            # Create plan payload with raw_response
             plan_payload = PlanPayload(
                 user_message=user_message,
-                steps=steps,
-                title=plan_data.get("title", "Action Plan"),
-                description=plan_data.get("description", ""),
-                priority=plan_data.get("priority", "medium"),
-                estimated_duration=plan_data.get("timeline", "As needed"),
-                context_used=bool(enhanced_context),
+                steps=[],  # Empty for now - response is in raw_response
+                raw_response=raw_response,  # NEW: Store the full Markdown response
+                title="Plan",
+                description=user_message[:100],
+                priority="medium",
+                estimated_duration="As needed",
+                context_used=bool(compacted_context),
                 llm_generated=True
             )
             
         except Exception as e:
             logger.error("Failed to generate plan with LLM", error=str(e))
-            # Generate basic fallback without mock templates
-            # IMPROVED FALLBACK: Don't hallucinate specific steps for vague requests
-            if len(user_message.split()) < 4 and "plan" in user_message.lower():
-                 steps = [
-                    "Please provide more details about what you'd like to plan",
-                    "I can help with daily routines, projects, or shopping",
-                    "Let me know your specific goals"
-                ]
-            else:
-                steps = [
-                    "Analyze the request and requirements",
-                    "Create a structured action plan",
-                    "Execute the plan step by step"
-                ]
+            # Fallback: Use a simple error message that follows the planner persona
+            fallback_response = """I apologize, but I'm having trouble generating your plan right now.
+
+Please try:
+- Being more specific about what you want to plan (e.g., "2-day muscle gain routine")
+- Specifying the duration (days, weeks, months)
+- Checking your request for clarity
+
+If the problem persists, please try again in a moment."""
             
             plan_payload = PlanPayload(
                 user_message=user_message,
-                steps=steps,
+                steps=[],
+                raw_response=fallback_response,
+                title="Error",
+                description="Plan generation failed",
                 priority="medium",
-                estimated_duration="30 minutes",
+                estimated_duration="N/A",
                 context_used=False,
                 llm_generated=False
             )
@@ -137,7 +136,7 @@ class PlannerAgent:
             key=f"plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             value={
                 "user_message": user_message,
-                "steps": steps,
+                "raw_response": plan_payload.raw_response,
                 "created_at": datetime.now().isoformat()
             },
             category="planning"
@@ -151,7 +150,7 @@ class PlannerAgent:
             payload=plan_payload.dict()
         )
         
-        logger.info("Plan created", user_message=user_message, steps_count=len(steps), context_used=bool(context))
+        logger.info("Plan created", user_message=user_message, has_raw_response=bool(plan_payload.raw_response), context_used=bool(context))
         return response
     
     def _generate_fallback_steps(self, user_message: str, shopping_tool: ShoppingTool) -> List[str]:

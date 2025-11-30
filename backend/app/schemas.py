@@ -29,6 +29,7 @@ class PlanPayload(BaseModel):
     estimated_duration: str
     context_used: Optional[bool] = False
     llm_generated: Optional[bool] = False
+    raw_response: Optional[str] = None
 
 class ExecutionPayload(BaseModel):
     task: str

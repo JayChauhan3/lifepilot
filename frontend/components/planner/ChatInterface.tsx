@@ -2,8 +2,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiSend, FiUser, FiCpu } from "react-icons/fi";
+import { FiSend, FiUser, FiCpu, FiMic } from "react-icons/fi";
 import clsx from "clsx";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { plannerService } from "@/services/plannerService";
 
 type Message = {
     id: string;
@@ -17,7 +20,7 @@ export default function ChatInterface() {
         {
             id: "1",
             role: "assistant",
-            content: "Hello Jay! I'm ready to help you plan your day. What's on your mind?",
+            content: "Hello! I'm your **LifePilot Planner**. I create structured plans, routines, and schedules for any area of life where you want improvement. What would you like to plan today?",
             timestamp: new Date(),
         },
     ]);
@@ -35,7 +38,7 @@ export default function ChatInterface() {
     }, [messages, isTyping]);
 
     const handleSendMessage = async () => {
-        if (!inputValue.trim()) return;
+        if (!inputValue.trim() || isTyping) return;
 
         const newMessage: Message = {
             id: Date.now().toString(),
@@ -53,19 +56,33 @@ export default function ChatInterface() {
             textareaRef.current.style.height = 'auto';
         }
 
-        // Simulate AI response
-        setTimeout(() => {
+        try {
+            // Call backend API
+            const response = await plannerService.chat(inputValue);
+
             setIsTyping(false);
             setMessages((prev) => [
                 ...prev,
                 {
                     id: (Date.now() + 1).toString(),
                     role: "assistant",
-                    content: "I'm processing that for you. I'll update your schedule and tasks accordingly.",
+                    content: response.response || "I apologize, but I couldn't process that request.",
                     timestamp: new Date(),
                 },
             ]);
-        }, 2000);
+        } catch (error) {
+            console.error('Chat error:', error);
+            setIsTyping(false);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: (Date.now() + 1).toString(),
+                    role: "assistant",
+                    content: "I apologize, but I encountered an error. Please try again.",
+                    timestamp: new Date(),
+                },
+            ]);
+        }
     };
 
     const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -127,7 +144,43 @@ export default function ChatInterface() {
                                 ? "bg-primary-600 text-white rounded-tr-none"
                                 : "bg-white text-gray-800 border border-gray-100 rounded-tl-none"
                         )}>
-                            {message.content}
+                            {message.role === "assistant" ? (
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    components={{
+                                        table: ({ node, ...props }) => (
+                                            <div className="overflow-x-auto my-4 rounded-lg border border-gray-200">
+                                                <table className="w-full border-collapse bg-gray-50" {...props} />
+                                            </div>
+                                        ),
+                                        thead: ({ node, ...props }) => <thead className="bg-gray-100" {...props} />,
+                                        th: ({ node, ...props }) => <th className="px-4 py-2 text-left font-semibold text-gray-700 border-b border-gray-200" {...props} />,
+                                        td: ({ node, ...props }) => <td className="px-4 py-2 text-gray-600 border-b border-gray-100" {...props} />,
+                                        h1: ({ node, ...props }) => <h1 className="text-2xl font-bold mt-4 mb-3 text-gray-900" {...props} />,
+                                        h2: ({ node, ...props }) => <h2 className="text-xl font-semibold mt-4 mb-2 text-gray-900" {...props} />,
+                                        h3: ({ node, ...props }) => <h3 className="text-lg font-semibold mt-3 mb-2 text-gray-800" {...props} />,
+                                        ul: ({ node, ...props }) => <ul className="mb-3 space-y-1 list-disc list-inside" {...props} />,
+                                        ol: ({ node, ...props }) => <ol className="mb-3 space-y-1 list-decimal list-inside" {...props} />,
+                                        li: ({ node, ...props }) => <li className="text-gray-700 ml-2" {...props} />,
+                                        p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
+                                        strong: ({ node, ...props }) => <strong className="font-semibold text-gray-900" {...props} />,
+                                        code: ({ node, inline, ...props }: any) => {
+                                            return inline ? (
+                                                <code className="bg-gray-100 rounded px-1.5 py-0.5 text-sm border border-gray-200 text-gray-800" {...props} />
+                                            ) : (
+                                                <pre className="bg-gray-100 rounded-lg p-3 text-sm overflow-x-auto my-3 border border-gray-200">
+                                                    <code className="text-gray-800" {...props} />
+                                                </pre>
+                                            );
+                                        },
+                                        hr: ({ node, ...props }) => <hr className="my-4 border-gray-200" {...props} />,
+                                    }}
+                                >
+                                    {message.content}
+                                </ReactMarkdown>
+                            ) : (
+                                message.content
+                            )}
                         </div>
                     </motion.div>
                 ))}
@@ -151,7 +204,7 @@ export default function ChatInterface() {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area (Old Design Layout) */}
+            {/* Input Area with Voice Button */}
             <div className="p-4 bg-white border-t border-gray-100">
                 <div className="relative bg-gray-50 border border-gray-200 rounded-2xl p-2 transition-all duration-300 focus-within:ring-2 focus-within:ring-primary-100 focus-within:border-primary-300 hover:bg-gray-100/50">
                     <div className="flex flex-col gap-2">
@@ -160,15 +213,20 @@ export default function ChatInterface() {
                             value={inputValue}
                             onChange={handleChange}
                             onKeyDown={handleKeyPress}
-                            placeholder={isTyping ? "AI is processing..." : "Type your plan here..."}
+                            placeholder={isTyping ? "AI is processing..." : "Type your plan here or use voice..."}
                             className="w-full px-2 bg-transparent border-0 focus:outline-none resize-none text-base text-gray-900 placeholder-gray-500"
                             rows={1}
                             style={{ maxHeight: '200px' }}
+                            disabled={isTyping}
                         />
                         <div className="flex justify-between items-center px-1">
-                            <div className="text-xs text-gray-500">
-                                {/* Optional: Add icons or hints here like in the old design */}
-                            </div>
+                            <button
+                                className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all duration-200 flex items-center gap-2 text-sm"
+                                title="Voice input (coming soon)"
+                            >
+                                <FiMic size={16} />
+                                <span className="text-xs">Voice</span>
+                            </button>
                             <button
                                 onClick={handleSendMessage}
                                 disabled={!inputValue.trim() || isTyping}

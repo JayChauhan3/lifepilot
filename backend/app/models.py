@@ -26,7 +26,7 @@ class TaskModel(MongoBaseModel):
     priority: str = "medium"  # low, medium, high
     due_date: Optional[datetime] = None
     tags: List[str] = []
-    is_completed: bool = False
+    isCompleted: bool = False
     
     # Additional metadata
     source: str = "manual"  # manual, ai_generated
@@ -37,7 +37,7 @@ class TaskModel(MongoBaseModel):
     date: Optional[str] = None  # YYYY-MM-DD
     duration: str  # e.g. "30m", "1h"
     type: str = "upcoming"  # today, upcoming, done
-    priority_index: Optional[int] = None  # For drag-and-drop ordering
+    priorityIndex: Optional[int] = None  # For drag-and-drop ordering
 
 
 def _to_12h(time_str: str) -> str:

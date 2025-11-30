@@ -15,6 +15,7 @@ from app.api.tasks import router as tasks_router
 from app.api.routines import router as routines_router
 from app.api.users import router as users_router
 from app.api.auth import router as auth_router
+from app.api.history import router as history_router
 from app.core.orchestrator import orchestrator
 from app.core.websocket_manager import notification_manager
 from app.core.database import connect_to_mongo, close_mongo_connection, get_connection_status
@@ -91,6 +92,7 @@ app.include_router(chat_router, prefix="/api")
 app.include_router(tasks_router, prefix="/api")
 app.include_router(routines_router, prefix="/api")
 app.include_router(users_router, prefix="/api")
+app.include_router(history_router, prefix="/api")
 
 @app.get("/")
 async def root():

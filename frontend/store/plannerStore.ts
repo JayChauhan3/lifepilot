@@ -4,6 +4,7 @@ import { plannerService } from '../services/plannerService';
 
 interface PlannerState {
     tasks: Task[];
+    historyTasks: Task[];
     routines: Routine[];
     isLoading: boolean;
     error: string | null;
@@ -11,8 +12,9 @@ interface PlannerState {
 
     // Actions
     fetchTasks: () => Promise<void>;
+    fetchTaskHistory: () => Promise<void>;
     addTask: (task: Omit<Task, 'id'>) => Promise<void>;
-    updateTask: (id: string, task: Partial<Task>) => Promise<void>;
+    updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
     deleteTask: (id: string) => Promise<void>;
     deleteTasksByType: (type: TaskType) => Promise<void>; // For "Delete All" in a column
     toggleTaskCompletion: (id: string) => Promise<void>;
@@ -21,12 +23,14 @@ interface PlannerState {
 
     fetchRoutines: () => Promise<void>;
     addRoutine: (routine: Omit<Routine, 'id'>) => Promise<void>;
-    updateRoutine: (id: string, routine: Partial<Routine>) => Promise<void>;
+    updateRoutine: (id: string, updates: Partial<Routine>) => Promise<void>;
     deleteRoutine: (id: string) => Promise<void>;
+    toggleRoutineCompletion: (id: string, date: string) => Promise<void>;
 }
 
 export const usePlannerStore = create<PlannerState>((set, get) => ({
     tasks: [],
+    historyTasks: [],
     routines: [],
     isLoading: false,
     error: null,
@@ -38,7 +42,17 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             const tasks = await plannerService.getTasks();
             set({ tasks, isLoading: false });
         } catch (error) {
-            set({ error: 'Failed to fetch tasks', isLoading: false });
+            set({ error: (error as Error).message, isLoading: false });
+        }
+    },
+
+    fetchTaskHistory: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const historyTasks = await plannerService.getTaskHistory();
+            set({ historyTasks, isLoading: false });
+        } catch (error) {
+            set({ error: (error as Error).message, isLoading: false });
         }
     },
 
@@ -47,21 +61,25 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         try {
             const newTask = await plannerService.createTask(task);
             set((state) => ({ tasks: [...state.tasks, newTask], isLoading: false }));
+            // Check work block capacity after adding
+            get().syncTasks();
         } catch (error) {
-            set({ error: 'Failed to add task', isLoading: false });
+            set({ error: (error as Error).message, isLoading: false });
         }
     },
 
-    updateTask: async (id, updatedFields) => {
+    updateTask: async (id, updates) => {
         set({ isLoading: true, error: null });
         try {
-            await plannerService.updateTask(id, updatedFields);
+            const updatedTask = await plannerService.updateTask(id, updates);
             set((state) => ({
-                tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updatedFields } : t)),
+                tasks: state.tasks.map((t) => (t.id === id ? updatedTask : t)),
                 isLoading: false,
             }));
+            // Check work block capacity after update
+            get().syncTasks();
         } catch (error) {
-            set({ error: 'Failed to update task', isLoading: false });
+            set({ error: (error as Error).message, isLoading: false });
         }
     },
 
@@ -74,49 +92,32 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
                 isLoading: false,
             }));
         } catch (error) {
-            set({ error: 'Failed to delete task', isLoading: false });
+            set({ error: (error as Error).message, isLoading: false });
         }
     },
 
     deleteTasksByType: async (type) => {
         set({ isLoading: true, error: null });
         try {
-            // In a real app, we might need an API endpoint to delete by type or delete multiple
-            // For now, we'll just update the local state and assume backend handles it or we loop
-            const tasksToDelete = get().tasks.filter(t => t.type === type);
-            await Promise.all(tasksToDelete.map(t => plannerService.deleteTask(t.id)));
-
+            await plannerService.deleteTasksByType(type);
             set((state) => ({
                 tasks: state.tasks.filter((t) => t.type !== type),
                 isLoading: false
             }));
         } catch (error) {
-            set({ error: 'Failed to delete tasks', isLoading: false });
+            set({ error: (error as Error).message, isLoading: false });
         }
     },
 
     toggleTaskCompletion: async (id) => {
-        const task = get().tasks.find((t) => t.id === id);
-        if (!task) return;
-
-        const newIsCompleted = !task.isCompleted;
-        const newType = newIsCompleted ? 'done' : 'today'; // Default to today if unchecking
-
-        // Optimistic update
-        set((state) => ({
-            tasks: state.tasks.map((t) =>
-                t.id === id ? { ...t, isCompleted: newIsCompleted, type: newType as TaskType } : t
-            ),
-        }));
-
+        set({ error: null });
         try {
-            await plannerService.updateTask(id, { isCompleted: newIsCompleted, type: newType as TaskType });
-        } catch (error) {
-            // Revert on failure
+            const updatedTask = await plannerService.toggleTaskCompletion(id);
             set((state) => ({
-                tasks: state.tasks.map((t) => (t.id === id ? task : t)),
-                error: 'Failed to update task status',
+                tasks: state.tasks.map((t) => (t.id === id ? updatedTask : t)),
             }));
+        } catch (error) {
+            set({ error: (error as Error).message });
         }
     },
 
@@ -125,13 +126,9 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         // Optimistic update: Reorder tasks in state based on taskIds
         set((state) => {
             const taskMap = new Map(state.tasks.map(t => [t.id, t]));
-            const reorderedTasks = taskIds.map((id, index) => {
-                const task = taskMap.get(id);
-                if (task) {
-                    return { ...task, priorityIndex: index };
-                }
-                return null;
-            }).filter(Boolean) as Task[];
+            const reorderedTasks = taskIds
+                .map(id => taskMap.get(id))
+                .filter((t): t is Task => t !== undefined);
 
             // Keep tasks that are NOT in the reordered list (e.g. other columns)
             const otherTasks = state.tasks.filter(t => !taskIds.includes(t.id));
@@ -146,7 +143,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             console.log('Store: Backend reorder success');
         } catch (error) {
             console.error('Store: Backend reorder failed', error);
-            set({ error: 'Failed to reorder tasks' });
+            set({ error: (error as Error).message });
             // TODO: Revert state if needed, but fetchTasks usually refreshes it
             get().fetchTasks();
         }
@@ -219,6 +216,18 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         } catch (error) {
             console.error('Failed to delete routine:', error);
             set({ error: 'Failed to delete routine', isLoading: false });
+        }
+    },
+
+    toggleRoutineCompletion: async (id, date) => {
+        set({ error: null });
+        try {
+            const updatedRoutine = await plannerService.toggleRoutineCompletion(id, date);
+            set((state) => ({
+                routines: state.routines.map((r) => (r.id === id ? updatedRoutine : r)),
+            }));
+        } catch (error) {
+            set({ error: (error as Error).message });
         }
     },
 }));

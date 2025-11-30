@@ -199,6 +199,62 @@ async def check_work_block_capacity(user_id: str) -> Dict[str, Any]:
     }
 
 
+async def archive_old_completed_tasks(user_id: str) -> List[str]:
+    """
+    Archive completed tasks that are older than yesterday (keep Today + Yesterday).
+    Moves them to 'tasks_archive' collection and removes from 'tasks'.
+    
+    Returns:
+        List of task IDs that were archived
+    """
+    db = get_database()
+    if db is None:
+        raise RuntimeError("Database not initialized")
+    
+    tasks_collection = db["tasks"]
+    archive_collection = db["tasks_archive"]
+    
+    today = datetime.now()
+    yesterday = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    # Find completed tasks with date < yesterday
+    # We keep tasks from Today and Yesterday. Anything strictly older than Yesterday is archived.
+    query = {
+        "user_id": user_id,
+        "isCompleted": True,
+        "date": {"$lt": yesterday}
+    }
+    
+    # Get tasks to archive
+    tasks_to_archive = []
+    cursor = tasks_collection.find(query)
+    async for doc in cursor:
+        tasks_to_archive.append(doc)
+    
+    archived_ids = []
+    if tasks_to_archive:
+        # Insert into archive
+        # Add archived_at timestamp
+        for task in tasks_to_archive:
+            task["archived_at"] = datetime.now()
+            archived_ids.append(str(task["_id"]))
+            
+        await archive_collection.insert_many(tasks_to_archive)
+        
+        # Delete from main collection
+        delete_ids = [task["_id"] for task in tasks_to_archive]
+        await tasks_collection.delete_many({"_id": {"$in": delete_ids}})
+    
+    logger.info(
+        "Archived old completed tasks",
+        user_id=user_id,
+        count=len(archived_ids),
+        threshold_date=yesterday
+    )
+    
+    return archived_ids
+
+
 async def sync_task_states(user_id: str) -> Dict[str, Any]:
     """
     Main sync function - orchestrates all task transitions
@@ -207,13 +263,16 @@ async def sync_task_states(user_id: str) -> Dict[str, Any]:
         dict with sync results and warnings
     """
     try:
-        # Step 1: Move unchecked tasks to unfinished (do this first)
+        # Step 1: Archive old completed tasks (cleanup first)
+        archived_ids = await archive_old_completed_tasks(user_id)
+
+        # Step 2: Move unchecked tasks to unfinished
         unfinished_ids = await move_unchecked_to_unfinished(user_id)
         
-        # Step 2: Move upcoming tasks to today
+        # Step 3: Move upcoming tasks to today
         today_ids = await move_upcoming_to_today(user_id)
         
-        # Step 3: Check work block capacity
+        # Step 4: Check work block capacity
         capacity_check = await check_work_block_capacity(user_id)
         
         logger.info(
@@ -221,6 +280,7 @@ async def sync_task_states(user_id: str) -> Dict[str, Any]:
             user_id=user_id,
             moved_to_today=len(today_ids),
             moved_to_unfinished=len(unfinished_ids),
+            archived_count=len(archived_ids),
             warning=capacity_check.get("warning", False)
         )
         
@@ -228,8 +288,10 @@ async def sync_task_states(user_id: str) -> Dict[str, Any]:
             "success": True,
             "movedToToday": len(today_ids),
             "movedToUnfinished": len(unfinished_ids),
+            "archivedCount": len(archived_ids),
             "todayTaskIds": today_ids,
             "unfinishedTaskIds": unfinished_ids,
+            "archivedTaskIds": archived_ids,
             **capacity_check
         }
     

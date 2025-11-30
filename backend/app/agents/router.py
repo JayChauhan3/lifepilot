@@ -99,6 +99,8 @@ class RouterAgent:
             r'plan\s+to',
             r'strategy\s+for',
             r'roadmap\s+for',
+            r'roadmap',  # Match standalone "roadmap" or "DSA roadmap"
+            r'give\s+me\s+a\s+(plan|routine|schedule|roadmap)',
             r'steps\s+to',
             r'how\s+to\s+(start|begin|organize|plan)',
             r'what\s+are\s+the\s+steps',
@@ -194,8 +196,8 @@ class RouterAgent:
             if re.search(pattern, message_lower):
                 return "error_handling"
         
-        # Default to general conversation (will be handled by real Gemini, not mock)
-        return "general"
+        # Default to planning request (AI should always behave as a planner)
+        return "planning_request"
 
     async def process_message(self, user_id: str, message: str) -> Dict[str, Any]:
         """Process message through intelligent routing"""
@@ -282,51 +284,44 @@ class RouterAgent:
                 logger.info("Processing planning request", user_id=user_id)
                 agent_used = "planning_agent"
                 tools_used = ["task_planner", "llm_service"]
-                # Handle planning requests
-                plan_response = await self.planner.create_plan(message, user_id)
-                plan_steps = plan_response.payload.get("steps", [])
                 
-                if plan_steps:
-                    # Format the plan nicely with Markdown
-                    plan_title = plan_response.payload.get("title", "Here's your plan")
-                    plan_desc = plan_response.payload.get("description", "")
-                    
-                    formatted_response = f"## {plan_title}\n\n"
-                    if plan_desc:
-                        formatted_response += f"_{plan_desc}_\n\n"
-                    
-                    for i, step in enumerate(plan_steps, 1):
-                        if isinstance(step, dict):
-                            action = step.get("action", "")
-                            details = step.get("details", "")
-                            formatted_response += f"**{i}. {action}**\n"
-                            if details:
-                                formatted_response += f"   - {details}\n"
-                        else:
-                            formatted_response += f"{i}. {step}\n"
-                    
-                    formatted_response += f"\n**Timeline:** {plan_response.payload.get('estimated_duration', 'N/A')}\n\n"
-                    
-                    # Add Summary Table
-                    formatted_response += "### 📋 Summary Table\n\n"
-                    formatted_response += "| Step | Action | Details |\n"
-                    formatted_response += "| :--- | :--- | :--- |\n"
-                    
-                    for i, step in enumerate(plan_steps, 1):
-                        if isinstance(step, dict):
-                            action = step.get("action", "Action")
-                            details = step.get("details", "-")
-                            # Truncate details for table if too long
-                            short_details = (details[:50] + '...') if len(details) > 50 else details
-                            formatted_response += f"| {i} | {action} | {short_details} |\n"
-                        else:
-                            formatted_response += f"| {i} | {step} | - |\n"
-                    
-                    final_response = formatted_response
-                    logger.info("Planning completed", user_id=user_id, steps_count=len(plan_steps))
+                # Get plan from PlannerAgent
+                plan_response = await self.planner.create_plan(message, user_id)
+                
+                # NEW: Check for raw_response first (from new strict planner persona)
+                if "raw_response" in plan_response.payload and plan_response.payload["raw_response"]:
+                    # Use the AI-generated Markdown response directly
+                    final_response = plan_response.payload["raw_response"]
+                    logger.info("Using raw_response from planner", user_id=user_id)
                 else:
-                    final_response = "I couldn't create a plan for that request."
-                    logger.info("Planning failed", user_id=user_id)
+                    # Fallback: Format steps manually (backwards compatibility)
+                    plan_steps = plan_response.payload.get("steps", [])
+                    
+                    if plan_steps:
+                        # Format the plan nicely with Markdown
+                        plan_title = plan_response.payload.get("title", "Here's your plan")
+                        plan_desc = plan_response.payload.get("description", "")
+                        
+                        formatted_response = f"## {plan_title}\n\n"
+                        if plan_desc:
+                            formatted_response += f"_{plan_desc}_\n\n"
+                        
+                        for i, step in enumerate(plan_steps, 1):
+                            if isinstance(step, dict):
+                                action = step.get("action", "")
+                                details = step.get("details", "")
+                                formatted_response += f"**{i}. {action}**\n"
+                                if details:
+                                    formatted_response += f"   - {details}\n"
+                            else:
+                                formatted_response += f"{i}. {step}\n"
+                        
+                        formatted_response += f"\n**Timeline:** {plan_response.payload.get('estimated_duration', 'N/A')}\n"
+                        final_response = formatted_response
+                        logger.info("Planning completed with fallback formatting", user_id=user_id, steps_count=len(plan_steps))
+                    else:
+                        final_response = "I couldn't create a plan for that request. Please provide more details."
+                        logger.info("Planning failed - no steps or raw_response", user_id=user_id)
                     
             elif message_type == "context_continuation":
                 logger.info("Processing context continuation", user_id=user_id)
@@ -374,44 +369,9 @@ class RouterAgent:
                 logger.info("Processing general conversation", user_id=user_id)
                 agent_used = "conversation_agent"
                 tools_used = ["llm_service"]
-                # Default: Use real Gemini for general conversation (NO MORE MOCK PIPELINE)
                 
-                # Get chat history
-                history = self.session_service.get_chat_history(session_id, limit=5)
-                history_str = ""
-                for msg in history:
-                    role = "User" if msg["role"] == "user" else "LifePilot"
-                    history_str += f"{role}: {msg['content']}\n"
-                
-                system_instruction = """
-You are LifePilot, a helpful and structured AI assistant.
-
-VERSATILITY & ADAPTABILITY:
-- You are a versatile assistant capable of helping with ANY topic (coding, cooking, travel, lifestyle, etc.).
-- You can switch topics seamlessly. Do not restrict yourself to the previous topic or domain.
-- If the user changes the subject, adapt immediately.
-
-CONTEXT AWARENESS:
-- You have access to the recent conversation history.
-- Use this context to answer follow-up questions (e.g., "tell me more about that").
-- If the user refers to something previously discussed, use that information.
-
-RESPONSE FORMATTING:
-ALWAYS use Markdown formatting to make your responses clear and visually appealing.
-- Use **Headings** (##, ###) to organize sections.
-- Use **Tables** to present structured data, comparisons, or lists.
-- Use **Bold** for key terms.
-- Use **Emojis** to add visual interest to headings and key points.
-- Use **Lists** (bulleted or numbered) for steps or items.
-- At the end of your response, provide a **💡 Suggestion** for what the user might want to do next.
-
-CLARIFICATION OVER HALLUCINATION:
-- If the user's request is vague (e.g., "plan something"), DO NOT make up a random plan.
-- Instead, ask clarifying questions to understand their needs (e.g., "What would you like me to plan?").
-- Only provide a detailed plan when you have sufficient information.
-"""
-                full_prompt = f"{system_instruction}\n\nConversation History:\n{history_str}\nUser Message: {message}"
-                final_response = self.llm_service.generate_text(full_prompt)
+                # Use the strict LifePilot Planner persona
+                final_response = self.llm_service.generate_planner_response(message)
                 logger.info("General conversation completed", user_id=user_id)
             
             # Store final response in session context and history

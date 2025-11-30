@@ -195,8 +195,8 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
     // Lock date if it's a "Today" task (or intended to be)
     const isDateLocked = type === 'today';
 
-    // Read-only mode for completed tasks
-    const isReadOnly = initialData?.isCompleted === true || initialData?.type === 'done';
+    // Read-only mode for completed tasks and unfinished tasks
+    const isReadOnly = initialData?.isCompleted === true || initialData?.type === 'done' || initialData?.type === 'unfinished';
 
     return (
         <AnimatePresence>
@@ -295,7 +295,7 @@ export default function TaskModal({ isOpen, onClose, onSave, initialData, defaul
                                                 onChange={(e) => setDate(e.target.value)}
                                                 disabled={isDateLocked && !initialData || isReadOnly}
                                                 readOnly={type === 'today'}
-                                                min={type === 'upcoming' && !initialData ? getTomorrowDate() : undefined}
+                                                min={type === 'upcoming' ? getTomorrowDate() : undefined}
                                                 className={clsx(
                                                     "w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 outline-none transition-all",
                                                     (isDateLocked || isReadOnly)

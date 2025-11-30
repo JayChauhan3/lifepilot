@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
     FiHome,
@@ -84,10 +85,15 @@ export default function Sidebar() {
                 <div className="flex flex-col h-full">
                     {/* Logo Section */}
                     <div className="h-16 flex items-center px-6 border-b border-gray-50">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                                <span className="text-white font-bold text-lg">L</span>
-                            </div>
+                        <div className="flex items-center gap-3">
+                            <Image
+                                src="/images/logo.png"
+                                alt="LifePilot Logo"
+                                width={32}
+                                height={32}
+                                className="object-contain"
+                                priority
+                            />
                             <span className="text-xl font-bold text-gray-900 tracking-tight">LifePilot</span>
                         </div>
                     </div>

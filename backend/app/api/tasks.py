@@ -125,6 +125,41 @@ async def update_task(
         logger.error("Failed to update task", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/tasks/{task_id}/toggle", response_model=TaskModel)
+async def toggle_task_completion(
+    task_id: str,
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Toggle task completion status"""
+    try:
+        # Get the current task
+        task = await task_service.get_task(current_user.user_id, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        # Toggle completion
+        new_is_completed = not task.isCompleted
+        new_type = 'done' if new_is_completed else 'today'
+        
+        # Update the task
+        updates = {
+            'isCompleted': new_is_completed,
+            'type': new_type
+        }
+        
+        updated_task = await task_service.update_task(current_user.user_id, task_id, updates)
+        
+        if not updated_task:
+            raise HTTPException(status_code=404, detail="Task not found")
+            
+        logger.info("Task completion toggled", task_id=task_id, is_completed=new_is_completed, user_id=current_user.user_id)
+        return updated_task
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to toggle task completion", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/tasks/{task_id}")
 async def delete_task(task_id: str, current_user: UserModel = Depends(get_current_user)):
     """Delete a task"""

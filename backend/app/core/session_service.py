@@ -6,12 +6,21 @@ from datetime import datetime, timedelta
 logger = structlog.get_logger()
 
 class SessionService:
-    """Service to manage user sessions"""
+    """Service to manage user sessions (Singleton)"""
+    
+    _instance = None
+    _sessions: Dict[str, Dict[str, Any]] = {}
+    _session_timeout = timedelta(hours=24)
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SessionService, cls).__new__(cls)
+            logger.info("SessionService initialized (singleton)")
+        return cls._instance
     
     def __init__(self):
-        logger.info("SessionService initialized")
-        self.sessions: Dict[str, Dict[str, Any]] = {}
-        self.session_timeout = timedelta(hours=24)
+        # Don't re-initialize if already initialized
+        pass
     
     def create_session(self, user_id: str) -> str:
         """Create a new session for user"""
@@ -27,19 +36,17 @@ class SessionService:
             "history": []
         }
         
-        self.sessions[session_id] = session_data
-        logger.info("Session created", session_id=session_id, user_id=user_id)
-        self.sessions[session_id] = session_data
+        self._sessions[session_id] = session_data
         logger.info("Session created", session_id=session_id, user_id=user_id)
         return session_id
     
     def get_active_session(self, user_id: str) -> str:
         """Get active session for user or create new one"""
         # Check for existing active session
-        for session_id, session in self.sessions.items():
+        for session_id, session in self._sessions.items():
             if session["user_id"] == user_id:
                 # Check if expired
-                if datetime.now() - session["last_activity"] <= self.session_timeout:
+                if datetime.now() - session["last_activity"] <= self._session_timeout:
                     # Update activity time
                     session["last_activity"] = datetime.now()
                     logger.info("Active session found", session_id=session_id, user_id=user_id)
@@ -50,13 +57,13 @@ class SessionService:
     
     def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get session by ID"""
-        if session_id in self.sessions:
-            session = self.sessions[session_id]
+        if session_id in self._sessions:
+            session = self._sessions[session_id]
             
             # Check if session is expired
-            if datetime.now() - session["last_activity"] > self.session_timeout:
+            if datetime.now() - session["last_activity"] > self._session_timeout:
                 logger.info("Session expired", session_id=session_id)
-                self.sessions.pop(session_id, None)
+                self._sessions.pop(session_id, None)
                 return None
             
             # Update last activity
@@ -97,6 +104,7 @@ class SessionService:
             # Keep history limited to last 50 messages to prevent bloating
             if len(session["history"]) > 50:
                 session["history"] = session["history"][-50:]
+            logger.info("Message added to session", session_id=session_id, role=role, history_length=len(session["history"]))
             return True
         return False
 
@@ -112,12 +120,12 @@ class SessionService:
         current_time = datetime.now()
         expired_sessions = []
         
-        for session_id, session in self.sessions.items():
-            if current_time - session["last_activity"] > self.session_timeout:
+        for session_id, session in self._sessions.items():
+            if current_time - session["last_activity"] > self._session_timeout:
                 expired_sessions.append(session_id)
         
         for session_id in expired_sessions:
-            self.sessions.pop(session_id, None)
+            self._sessions.pop(session_id, None)
         
         logger.info("Expired sessions cleaned up", count=len(expired_sessions))
         return len(expired_sessions)
