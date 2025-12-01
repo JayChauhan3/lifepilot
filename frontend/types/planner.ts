@@ -7,6 +7,7 @@ export interface Task {
     aim: string;
     date: string; // YYYY-MM-DD
     duration: string; // e.g. "30m", "1h"
+    time?: string; // HH:mm format
     isCompleted: boolean;
     type: TaskType;
     priorityIndex?: number; // For drag-and-drop ordering
