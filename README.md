@@ -132,19 +132,18 @@ graph TB
 
 ### AI Architecture Diagram
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6366F1', 'primaryTextColor': '#fff', 'primaryBorderColor': '#fff', 'lineColor': '#94A3B8', 'secondaryColor': '#FEF3C7', 'secondaryTextColor': '#000', 'secondaryBorderColor': '#fff', 'tertiaryColor': '#D1FAE5', 'tertiaryTextColor': '#000', 'tertiaryBorderColor': '#fff', 'noteBkgColor': '#DBEAFE', 'noteTextColor': '#000', 'noteBorderColor': '#fff'}}}%%
 mindmap
-  root((LifePilot AI))
-    Core Orchestration
+  root((LifePilot AI)):::rootStyle
+    Core Orchestration:::amberBox
       MultiAgentOrchestrator
         Workflow Management
         State Machine
         A2A Protocol
-    Entry Point
+    Entry Point:::greenBox
       RouterAgent
         Intent Detection
         Direct Dispatch
-    Specialized Agents
+    Specialized Agents:::purpleBox
       PlannerAgent
         LLMService
       ExecutorAgent
@@ -162,7 +161,7 @@ mindmap
         Notification Checks
       UIAgent
         Dashboard Generation
-    Memory System
+    Memory System:::blueBox
       MemoryBank
         Pinecone Vector DB
         Semantic Search
@@ -170,11 +169,18 @@ mindmap
         Conversation History
       ContextCompactor
         Token Management
-    Observability
+    Observability:::pinkBox
       ObservabilityManager
         OpenTelemetry Tracing
         Structlog Logging
         System Metrics
+        
+    classDef rootStyle fill:#6366F1,stroke:#fff,stroke-width:4px,color:#fff
+    classDef amberBox fill:#FEF3C7,stroke:#fff,stroke-width:3px,color:#000
+    classDef greenBox fill:#D1FAE5,stroke:#fff,stroke-width:3px,color:#000
+    classDef purpleBox fill:#EDE9FE,stroke:#fff,stroke-width:3px,color:#000
+    classDef blueBox fill:#DBEAFE,stroke:#fff,stroke-width:3px,color:#000
+    classDef pinkBox fill:#FCE7F3,stroke:#fff,stroke-width:3px,color:#000
 ```
 
 ### Mind Map
