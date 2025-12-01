@@ -1,7 +1,7 @@
 import { Task, Routine } from '../types/planner';
 import { authService } from './authService';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Helper to get headers with auth token
 const getHeaders = (): HeadersInit => {
