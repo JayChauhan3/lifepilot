@@ -73,7 +73,18 @@ class Workflow:
             self.context = {}
 
 class MultiAgentOrchestrator:
-    """Orchestrates multi-agent workflows and interactions"""
+    """
+    Orchestrates multi-agent workflows and interactions.
+    
+    ARCHITECTURE NOTE:
+    This class implements the "Hub-and-Spoke" pattern where the Orchestrator acts as the central hub,
+    managing state and coordinating specialized agents (spokes).
+    
+    Key Responsibilities:
+    1. Workflow Management: Decomposing requests into execution steps.
+    2. State Machine: Tracking the lifecycle of workflows (PENDING -> RUNNING -> COMPLETED).
+    3. A2A Communication: Facilitating standardized message passing between agents.
+    """
     
     def __init__(self):
         self.a2a_protocol = A2AProtocol()
@@ -87,7 +98,6 @@ class MultiAgentOrchestrator:
             "router": RouterAgent(),
             "analyzer": AnalyzerAgent(),
             "knowledge": KnowledgeAgent(),
-            "notifications": NotificationAgent(),
             "ui": UIAgent(),
             "routine": routine_agent
         }
@@ -165,7 +175,15 @@ class MultiAgentOrchestrator:
     
     @trace_function("orchestrator.execute_workflow")
     async def _execute_workflow(self, workflow_id: str):
-        """Execute a workflow"""
+        """
+        Execute a workflow.
+        
+        IMPLEMENTATION DETAIL:
+        This method implements a non-blocking execution loop that:
+        1. Identifies ready steps (dependencies met).
+        2. Executes independent steps in parallel using asyncio.gather().
+        3. Updates workflow state and handles failures/deadlocks.
+        """
         workflow = self.workflows.get(workflow_id)
         if not workflow:
             logger.error("Workflow not found", workflow_id=workflow_id)
@@ -392,8 +410,6 @@ class MultiAgentOrchestrator:
             return "knowledge"
         elif any(keyword in action_lower for keyword in ["analyze", "understand", "interpret", "summary"]):
             return "analyzer"
-        elif any(keyword in action_lower for keyword in ["notify", "alert", "remind", "send"]):
-            return "notifications"
         elif any(keyword in action_lower for keyword in ["show", "display", "render", "dashboard"]):
             return "ui"
         else:

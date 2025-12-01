@@ -7,7 +7,7 @@ from ..core.memory_bank import MemoryBank, get_memory_bank
 from ..core.llm_service import get_llm_service
 from ..tools.calendar_tool import CalendarTool
 from ..tools.web_search_tool import WebSearchTool
-from ..tools.shopping_tool import ShoppingTool
+from ..tools.web_search_tool import WebSearchTool
 from typing import Dict, Any
 from .planner import PlannerAgent
 from .executor import ExecutorAgent
@@ -19,6 +19,14 @@ from .ui_agent import UIAgent
 logger = structlog.get_logger()
 
 class RouterAgent:
+    """
+    Intelligent Router for user interactions.
+    
+    ARCHITECTURE NOTE:
+    This agent serves as the "Gatekeeper" or "Entry Point" of the system.
+    It uses a combination of Regex Pattern Matching (for speed) and LLM Analysis (for complexity)
+    to route requests to the appropriate specialized agent.
+    """
     def __init__(self):
         logger.info("RouterAgent initialized")
         self.planner = PlannerAgent()
@@ -36,10 +44,19 @@ class RouterAgent:
         # Tools
         self.calendar_tool = CalendarTool()
         self.web_search_tool = WebSearchTool()
-        self.shopping_tool = ShoppingTool()
     
     def _detect_message_type(self, message: str) -> str:
-        """Detect the type of message based on content"""
+        """
+        Detect the type of message based on content.
+        
+        IMPLEMENTATION DETAIL:
+        Uses a priority-based Regex matching system to classify intent into:
+        - planning_request (Highest Priority)
+        - knowledge_search
+        - memory_retrieve
+        - memory_store
+        - context_continuation
+        """
         message_lower = message.lower()
         
         # Memory storage patterns
