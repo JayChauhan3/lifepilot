@@ -135,19 +135,19 @@ graph TB
 
 ### Architecture Diagram
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '14px' }}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6366F1', 'primaryTextColor': '#fff', 'primaryBorderColor': '#4F46E5', 'lineColor': '#94A3B8', 'secondaryColor': '#FEF3C7', 'secondaryTextColor': '#000', 'secondaryBorderColor': '#F59E0B', 'tertiaryColor': '#D1FAE5', 'tertiaryTextColor': '#000', 'tertiaryBorderColor': '#10B981', 'noteBkgColor': '#DBEAFE', 'noteTextColor': '#000', 'noteBorderColor': '#3B82F6'}}}%%
 mindmap
   root((LifePilot AI))
-    Core_Orchestration:::amber
+    Core Orchestration
       MultiAgentOrchestrator
-        Workflow_Management
-        State_Machine
-        A2A_Protocol
-    Entry_Point:::green
+        Workflow Management
+        State Machine
+        A2A Protocol
+    Entry Point
       RouterAgent
-        Intent_Detection
-        Direct_Dispatch
-    Specialized_Agents:::purple
+        Intent Detection
+        Direct Dispatch
+    Specialized Agents
       PlannerAgent
         LLMService
       ExecutorAgent
@@ -155,35 +155,29 @@ mindmap
         PythonExecutionTool
       KnowledgeAgent
         WebSearchTool
-        RAG_Integration
+        RAG Integration
       NotificationAgent
-        Alert_Management
-        WebSocket_Delivery
+        Alert Management
+        WebSocket Delivery
       RoutineAgent
-        Cron_Scheduler
-        LongRunner_Tasks
-        Notification_Checks
+        Cron Scheduler
+        LongRunner Tasks
+        Notification Checks
       UIAgent
-        Dashboard_Generation
-    Memory_System:::blue
+        Dashboard Generation
+    Memory System
       MemoryBank
-        Pinecone_Vector_DB
-        Semantic_Search
+        Pinecone Vector DB
+        Semantic Search
       SessionService
-        Conversation_History
+        Conversation History
       ContextCompactor
-        Token_Management
-    Observability:::pink
+        Token Management
+    Observability
       ObservabilityManager
-        OpenTelemetry_Tracing
-        Structlog_Logging
-        System_Metrics
-        
-    classDef amber fill:#FEF3C7,stroke:#F59E0B,stroke-width:3px,color:#92400E
-    classDef green fill:#D1FAE5,stroke:#10B981,stroke-width:3px,color:#065F46
-    classDef purple fill:#EDE9FE,stroke:#8B5CF6,stroke-width:3px,color:#5B21B6
-    classDef blue fill:#DBEAFE,stroke:#3B82F6,stroke-width:3px,color:#1E40AF
-    classDef pink fill:#FCE7F3,stroke:#EC4899,stroke-width:3px,color:#9F1239
+        OpenTelemetry Tracing
+        Structlog Logging
+        System Metrics
 ```
 
 ### Core Components
