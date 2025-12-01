@@ -52,6 +52,7 @@ LifePilot employs a Hub-and-Spoke Agentic Architecture.
 
 ### Architecture Diagram
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#ffffff', 'lineColor': '#ffffff', 'textColor': '#ffffff' }}}%%
 mindmap
   root((LifePilot AI))
     Core_Orchestration
