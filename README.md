@@ -123,10 +123,10 @@ graph TB
     Planner --> MongoDB
     
     style UI fill:#4F46E5
-    style Router fill:#10B981
+    style Router fill:#059669
     style Orchestrator fill:#F59E0B
     style Gemini fill:#EA4335
-    style Pinecone fill:#00D4AA
+    style Pinecone fill:#047857
     style MongoDB fill:#47A248
 ```
 
