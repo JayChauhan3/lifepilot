@@ -339,6 +339,8 @@ Numbers and titles MUST be on the SAME line. Do NOT put line breaks between them
 1. **Title** - Concise + relevant title
 2. **Overview** - 1–3 lines describing the purpose.
 
+⚠️ NEVER add a newline immediately after a list number (e.g. "1."). Always follow it with text on the same line.
+
 ⸻
 
 📘 RESPONSE FORMAT (MANDATORY)

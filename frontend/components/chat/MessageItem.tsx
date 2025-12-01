@@ -78,9 +78,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
                 h1: ({ node, ...props }) => <h1 className="text-2xl font-bold mt-6 mb-4 text-white flex items-center gap-2" {...props} />,
                 h2: ({ node, ...props }) => <h2 className="text-xl font-semibold mt-6 mb-4 text-white flex items-center gap-2" {...props} />,
                 h3: ({ node, ...props }) => <h3 className="text-lg font-semibold mt-6 mb-3 text-white flex items-center gap-2" {...props} />,
-                ul: ({ node, ...props }) => <ul className="mb-4 space-y-1 list-disc list-inside" {...props} />,
-                ol: ({ node, ...props }) => <ol className="mb-4 space-y-1 list-decimal list-inside" {...props} />,
-                li: ({ node, ...props }) => <li className="text-gray-300 ml-4" {...props} />,
+                ul: ({ node, ...props }) => <ul className="mb-4 space-y-1 list-disc list-outside pl-5" {...props} />,
+                ol: ({ node, ...props }) => <ol className="mb-4 space-y-1 list-decimal list-outside pl-5" {...props} />,
+                li: ({ node, ...props }) => <li className="text-gray-300 pl-1" {...props} />,
                 code: ({ node, inline, className, children, ...props }: any) => {
                   return inline ? (
                     <code className="bg-gray-800 rounded px-2 py-1 text-sm border border-gray-700 text-gray-300" {...props}>
