@@ -26,8 +26,10 @@ export default function ChatInterface() {
     ]);
     const [inputValue, setInputValue] = useState("");
     const [isTyping, setIsTyping] = useState(false);
+    const [isListening, setIsListening] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const recognitionRef = useRef<any>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,6 +38,65 @@ export default function ChatInterface() {
     useEffect(() => {
         scrollToBottom();
     }, [messages, isTyping]);
+
+    // Initialize speech recognition
+    useEffect(() => {
+        if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+            const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+            recognitionRef.current = new SpeechRecognition();
+            recognitionRef.current.continuous = true;
+            recognitionRef.current.interimResults = true;
+            recognitionRef.current.lang = 'en-US';
+
+            recognitionRef.current.onresult = (event: any) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript + ' ';
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                if (finalTranscript) {
+                    setInputValue((prev) => prev + finalTranscript);
+                }
+            };
+
+            recognitionRef.current.onerror = (event: any) => {
+                console.error('Speech recognition error:', event.error);
+                setIsListening(false);
+            };
+
+            recognitionRef.current.onend = () => {
+                setIsListening(false);
+            };
+        }
+
+        return () => {
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+            }
+        };
+    }, []);
+
+    const toggleListening = () => {
+        if (!recognitionRef.current) {
+            alert('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.');
+            return;
+        }
+
+        if (isListening) {
+            recognitionRef.current.stop();
+            setIsListening(false);
+        } else {
+            recognitionRef.current.start();
+            setIsListening(true);
+        }
+    };
 
     const handleSendMessage = async () => {
         if (!inputValue.trim() || isTyping) return;
@@ -94,12 +155,15 @@ export default function ChatInterface() {
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setInputValue(e.target.value);
-        // Auto-resize textarea
+    };
+
+    // Auto-resize textarea when input value changes
+    useEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
             textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
         }
-    };
+    }, [inputValue]);
 
     return (
         <div className="flex flex-col h-[calc(100vh-8rem)] bg-white rounded-2xl shadow-soft border border-gray-100 overflow-hidden">
@@ -206,26 +270,35 @@ export default function ChatInterface() {
 
             {/* Input Area with Voice Button */}
             <div className="p-4 bg-white border-t border-gray-100">
-                <div className="relative bg-gray-50 border border-gray-200 rounded-2xl p-2 transition-all duration-300 focus-within:ring-2 focus-within:ring-primary-100 focus-within:border-primary-300 hover:bg-gray-100/50">
+                <div className={clsx(
+                    "relative bg-gray-50 border rounded-2xl p-2 transition-all duration-300 focus-within:ring-2 focus-within:ring-primary-100",
+                    isListening ? "border-red-400 ring-2 ring-red-100" : "border-gray-200 focus-within:border-primary-300 hover:bg-gray-100/50"
+                )}>
                     <div className="flex flex-col gap-2">
                         <textarea
                             ref={textareaRef}
                             value={inputValue}
                             onChange={handleChange}
                             onKeyDown={handleKeyPress}
-                            placeholder={isTyping ? "AI is processing..." : "Type your plan here or use voice..."}
+                            placeholder={isTyping ? "AI is processing..." : isListening ? "Listening..." : "Type your plan here or use voice..."}
                             className="w-full px-2 bg-transparent border-0 focus:outline-none resize-none text-base text-gray-900 placeholder-gray-500"
                             rows={1}
                             style={{ maxHeight: '200px' }}
                             disabled={isTyping}
                         />
-                        <div className="flex justify-between items-center px-1">
+                        <div className="flex justify-end items-center px-1 gap-2">
                             <button
-                                className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all duration-200 flex items-center gap-2 text-sm"
-                                title="Voice input (coming soon)"
+                                onClick={toggleListening}
+                                className={clsx(
+                                    "p-2 rounded-xl transition-all duration-200 flex items-center gap-2 text-sm",
+                                    isListening
+                                        ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
+                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                )}
+                                title={isListening ? "Stop listening" : "Start voice input"}
                             >
                                 <FiMic size={16} />
-                                <span className="text-xs">Voice</span>
+                                {isListening && <span className="text-xs">Listening...</span>}
                             </button>
                             <button
                                 onClick={handleSendMessage}
