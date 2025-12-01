@@ -132,7 +132,7 @@ graph TB
 
 ### AI Architecture Diagram
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6366F1', 'primaryTextColor': '#fff', 'primaryBorderColor': '#fff', 'lineColor': '#94A3B8', 'secondaryColor': '#FEF3C7', 'secondaryTextColor': '#000', 'secondaryBorderColor': '#fff', 'tertiaryColor': '#D1FAE5', 'tertiaryTextColor': '#000', 'tertiaryBorderColor': '#fff', 'noteBkgColor': '#DBEAFE', 'noteTextColor': '#000', 'noteBorderColor': '#fff'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6366F1', 'primaryTextColor': '#fff', 'primaryBorderColor': '#4F46E5', 'lineColor': '#94A3B8', 'secondaryColor': '#FEF3C7', 'secondaryTextColor': '#000', 'secondaryBorderColor': '#F59E0B', 'tertiaryColor': '#D1FAE5', 'tertiaryTextColor': '#000', 'tertiaryBorderColor': '#10B981', 'noteBkgColor': '#DBEAFE', 'noteTextColor': '#000', 'noteBorderColor': '#3B82F6'}}}%%
 mindmap
   root((LifePilot AI))
     Core Orchestration
