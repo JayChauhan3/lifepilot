@@ -127,7 +127,7 @@ graph TB
     style Orchestrator fill:#C92519
     style Gemini fill:#F87726
     style Pinecone fill:#4E9FE5
-    style MongoDB fill:#47A248
+    style MongoDB fill:#111111
 ```
 
 ### AI Architecture Diagram
