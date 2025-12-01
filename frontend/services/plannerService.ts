@@ -14,7 +14,7 @@ const getHeaders = (): HeadersInit => {
 export const plannerService = {
     // Task operations
     async getTasks(): Promise<Task[]> {
-        const response = await fetch(`${API_BASE_URL}/tasks`, {
+        const response = await fetch(`${API_BASE_URL}/api/tasks`, {
             headers: getHeaders(),
         });
 
@@ -37,7 +37,7 @@ export const plannerService = {
     },
 
     async getTaskHistory(): Promise<Task[]> {
-        const response = await fetch(`${API_BASE_URL}/history/tasks`, {
+        const response = await fetch(`${API_BASE_URL}/api/history/tasks`, {
             headers: getHeaders(),
         });
 
@@ -59,7 +59,7 @@ export const plannerService = {
     },
 
     async createTask(task: Omit<Task, 'id'>): Promise<Task> {
-        const response = await fetch(`${API_BASE_URL}/tasks`, {
+        const response = await fetch(`${API_BASE_URL}/api/tasks`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(task),
@@ -82,7 +82,7 @@ export const plannerService = {
     },
 
     async updateTask(id: string, updates: Partial<Task>): Promise<Task> {
-        const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
             method: 'PUT',
             headers: getHeaders(),
             body: JSON.stringify(updates),
@@ -105,7 +105,7 @@ export const plannerService = {
     },
 
     async deleteTask(id: string): Promise<void> {
-        const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
             method: 'DELETE',
             headers: getHeaders(),
         });
@@ -125,7 +125,7 @@ export const plannerService = {
     },
 
     async deleteTasksByType(type: string): Promise<void> {
-        const response = await fetch(`${API_BASE_URL}/tasks/type/${type}`, {
+        const response = await fetch(`${API_BASE_URL}/api/tasks/type/${type}`, {
             method: 'DELETE',
             headers: getHeaders(),
         });
@@ -140,7 +140,7 @@ export const plannerService = {
     },
 
     async toggleTaskCompletion(id: string): Promise<Task> {
-        const response = await fetch(`${API_BASE_URL}/tasks/${id}/toggle`, {
+        const response = await fetch(`${API_BASE_URL}/api/tasks/${id}/toggle`, {
             method: 'POST',
             headers: getHeaders(),
         });
@@ -162,7 +162,7 @@ export const plannerService = {
     },
 
     async reorderTasks(taskIds: string[]): Promise<void> {
-        const response = await fetch(`${API_BASE_URL}/tasks/reorder`, {
+        const response = await fetch(`${API_BASE_URL}/api/tasks/reorder`, {
             method: 'PUT',
             headers: getHeaders(),
             body: JSON.stringify({ task_ids: taskIds }),
@@ -178,7 +178,7 @@ export const plannerService = {
     },
 
     async syncTasks(): Promise<{ success: boolean; warning?: boolean; message?: string }> {
-        const response = await fetch(`${API_BASE_URL}/tasks/sync`, {
+        const response = await fetch(`${API_BASE_URL}/api/tasks/sync`, {
             method: 'POST',
             headers: getHeaders(),
         });
@@ -196,8 +196,8 @@ export const plannerService = {
 
     // Routine operations
     async getRoutines(): Promise<Routine[]> {
-        console.log('Fetching routines from:', `${API_BASE_URL}/routines`);
-        const response = await fetch(`${API_BASE_URL}/routines`, {
+        console.log('Fetching routines from:', `${API_BASE_URL}/api/routines`);
+        const response = await fetch(`${API_BASE_URL}/api/routines`, {
             headers: getHeaders(),
         });
 
@@ -277,7 +277,7 @@ export const plannerService = {
             is_active: true,
         };
 
-        const response = await fetch(`${API_BASE_URL}/routines`, {
+        const response = await fetch(`${API_BASE_URL}/api/routines`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(backendRoutine),
@@ -307,7 +307,7 @@ export const plannerService = {
         if (updates.icon !== undefined) backendUpdates.icon = updates.icon;
         if (updates.isWorkBlock !== undefined) backendUpdates.is_work_block = updates.isWorkBlock;
 
-        const response = await fetch(`${API_BASE_URL}/routines/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/routines/${id}`, {
             method: 'PUT',
             headers: getHeaders(),
             body: JSON.stringify(backendUpdates),
@@ -329,7 +329,7 @@ export const plannerService = {
     },
 
     async deleteRoutine(id: string): Promise<void> {
-        const response = await fetch(`${API_BASE_URL}/routines/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/routines/${id}`, {
             method: 'DELETE',
             headers: getHeaders(),
         });
@@ -349,7 +349,7 @@ export const plannerService = {
     },
 
     async toggleRoutineCompletion(id: string, date: string): Promise<Routine> {
-        const response = await fetch(`${API_BASE_URL}/routines/${id}/toggle`, {
+        const response = await fetch(`${API_BASE_URL}/api/routines/${id}/toggle`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({ date }),
@@ -430,7 +430,7 @@ export const plannerService = {
                 params.append('exclude_id', excludeId);
             }
 
-            const response = await fetch(`${API_BASE_URL}/routines/check-conflicts?${params}`, {
+            const response = await fetch(`${API_BASE_URL}/api/routines/check-conflicts?${params}`, {
                 headers: getHeaders(),
             });
 
@@ -451,7 +451,7 @@ export const plannerService = {
         // TODO: Get actual user_id from getCurrentUser() when needed
         const userId = 'default';
 
-        const response = await fetch(`${API_BASE_URL}/chat`, {
+        const response = await fetch(`${API_BASE_URL}/api/chat`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({
