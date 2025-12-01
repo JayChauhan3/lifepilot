@@ -1,7 +1,7 @@
 # LifePilot
 ## Your AI-Powered Personal Growth Architect
 
-![LifePilot Banner](https://img.shields.io/badge/Status-Live-green) ![Gemini](https://img.shields.io/badge/AI-Gemini_Flash-blue) ![Agentic](https://img.shields.io/badge/Architecture-Multi--Agent-purple) <div align="right">[![Live Demo](https://img.shields.io/badge/Live-Demo-667eea?style=for-the-badge&logo=vercel&logoColor=white)](https://lifepilot-nine.vercel.app/)</div>
+[live now](https://lifepilot-nine.vercel.app/)
 
 ### Project Description
 
