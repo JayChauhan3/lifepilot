@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
     JWT_SECRET_KEY: str
+    FRONTEND_URL: str = "http://localhost:3000"  # Frontend URL for OAuth redirects
     
     class Config:
         env_file = ".env"

@@ -217,7 +217,8 @@ async def google_callback(request: Request):
         await sync_task_states(user.user_id)
         
         # Redirect to frontend with token
-        frontend_url = "http://localhost:3000"  # TODO: Get from config
+        from app.config import settings
+        frontend_url = settings.FRONTEND_URL
         return RedirectResponse(url=f"{frontend_url}/auth/callback?token={access_token}")
         
     except Exception as e:
