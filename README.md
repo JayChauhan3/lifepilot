@@ -135,22 +135,19 @@ graph TB
 
 ### Architecture Diagram
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {
-  'primaryColor': '#FED7AA',
-  'primaryTextColor': '#000',
-  'primaryBorderColor': '#F97316',
-  'secondaryColor': '#FFFFFF',
-  'secondaryTextColor': '#000',
-  'secondaryBorderColor': '#94A3B8',
-  'tertiaryColor': '#A7F3D0',
-  'tertiaryTextColor': '#000',
-  'tertiaryBorderColor': '#10B981',
-  'noteBkgColor': '#BAE6FD',
-  'noteTextColor': '#000',
-  'noteBorderColor': '#0EA5E9',
-  'lineColor': '#64748B',
-  'fontSize': '16px',
-  'darkMode': 'false'
+%%{init: {'theme': 'default', 'themeVariables': {
+  'primaryColor': '#FFE4B5',
+  'primaryTextColor': '#1a1a1a',
+  'primaryBorderColor': '#FF8C00',
+  'secondaryColor': '#F8F9FA',
+  'secondaryTextColor': '#1a1a1a',
+  'secondaryBorderColor': '#6C757D',
+  'tertiaryColor': '#C7F9CC',
+  'tertiaryTextColor': '#1a1a1a',
+  'tertiaryBorderColor': '#28A745',
+  'noteBkgColor': '#D0EFFF',
+  'noteTextColor': '#1a1a1a',
+  'noteBorderColor': '#17A2B8'
 }}}%%
 mindmap
   root((LifePilot AI))
