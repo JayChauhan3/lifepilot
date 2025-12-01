@@ -136,23 +136,24 @@ graph TB
 ### Architecture Diagram
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
-  'primaryColor': '#FEF3C7',
+  'primaryColor': '#FED7AA',
   'primaryTextColor': '#000',
-  'primaryBorderColor': '#F59E0B',
-  'secondaryColor': '#D1FAE5',
+  'primaryBorderColor': '#F97316',
+  'secondaryColor': '#FFFFFF',
   'secondaryTextColor': '#000',
-  'secondaryBorderColor': '#10B981',
-  'tertiaryColor': '#EDE9FE',
+  'secondaryBorderColor': '#94A3B8',
+  'tertiaryColor': '#A7F3D0',
   'tertiaryTextColor': '#000',
-  'tertiaryBorderColor': '#8B5CF6',
-  'noteBkgColor': '#DBEAFE',
+  'tertiaryBorderColor': '#10B981',
+  'noteBkgColor': '#BAE6FD',
   'noteTextColor': '#000',
-  'noteBorderColor': '#3B82F6',
+  'noteBorderColor': '#0EA5E9',
   'lineColor': '#64748B',
-  'fontSize': '16px'
+  'fontSize': '16px',
+  'darkMode': 'false'
 }}}%%
 mindmap
-  root((🚀 LifePilot AI))
+  root((LifePilot AI))
     Core Orchestration
       MultiAgentOrchestrator
         Workflow Management
