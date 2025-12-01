@@ -130,7 +130,7 @@ graph TB
     style MongoDB fill:#47A248
 ```
 
-### System Architecture
+### AI Architecture
 ![LifePilot Architecture](frontend/public/images/architecture.png)
 
 ### Mind Map
@@ -138,7 +138,7 @@ graph TB
 
 ### Architecture Diagram
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#ffffff', 'lineColor': '#ffffff', 'textColor': '#ffffff' }}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4F46E5', 'primaryTextColor': '#fff', 'primaryBorderColor': '#4F46E5', 'lineColor': '#6366F1', 'secondaryColor': '#10B981', 'tertiaryColor': '#F59E0B', 'background': '#1F2937', 'mainBkg': '#4F46E5', 'secondBkg': '#10B981', 'tertiaryBkg': '#F59E0B'}}}%%
 mindmap
   root((LifePilot AI))
     Core_Orchestration
