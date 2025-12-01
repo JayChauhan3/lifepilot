@@ -124,9 +124,9 @@ graph TB
     
     style UI fill:#4F46E5
     style Router fill:#059669
-    style Orchestrator fill:#F59E0B
-    style Gemini fill:#EA4335
-    style Pinecone fill:#047857
+    style Orchestrator fill:#C92519
+    style Gemini fill:#F87726
+    style Pinecone fill:#4E9FE5
     style MongoDB fill:#47A248
 ```
 
