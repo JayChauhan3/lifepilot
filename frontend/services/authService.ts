@@ -56,7 +56,7 @@ class AuthService {
 
     // Register new user
     async register(data: RegisterData): Promise<User> {
-        const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -78,7 +78,7 @@ class AuthService {
         formData.append('username', credentials.email);
         formData.append('password', credentials.password);
 
-        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -98,7 +98,7 @@ class AuthService {
 
     // Login with Google OAuth
     loginWithGoogle(): void {
-        window.location.href = `${API_BASE_URL}/auth/google/login`;
+        window.location.href = `${API_BASE_URL}/api/auth/google/login`;
     }
 
     // Logout
@@ -108,7 +108,7 @@ class AuthService {
 
     // Get current user
     async verifyEmail(email: string, code: string): Promise<AuthResponse> {
-        const response = await fetch(`${API_BASE_URL}/auth/verify`, {
+        const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -132,7 +132,7 @@ class AuthService {
             throw new Error('Not authenticated');
         }
 
-        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
