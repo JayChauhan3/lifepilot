@@ -117,7 +117,7 @@ export default function Sidebar() {
                                     )}
                                 >
                                     {isActive && (
-                                        <motion.div
+                                        <motion.span
                                             layoutId="activeNav"
                                             className="absolute left-0 w-1 h-8 bg-primary-600 rounded-r-full"
                                             initial={{ opacity: 0 }}
