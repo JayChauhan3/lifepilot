@@ -136,18 +136,18 @@ graph TB
 ### Architecture Diagram
 ```mermaid
 %%{init: {'theme': 'default', 'themeVariables': {
-  'primaryColor': '#FFE4B5',
+  'primaryColor': '#ff6600ff',
   'primaryTextColor': '#1a1a1a',
-  'primaryBorderColor': '#FF8C00',
+  'primaryBorderColor': '#ff8000ff',
   'secondaryColor': '#F8F9FA',
   'secondaryTextColor': '#1a1a1a',
   'secondaryBorderColor': '#6C757D',
-  'tertiaryColor': '#C7F9CC',
+  'tertiaryColor': '#00ff1aff',
   'tertiaryTextColor': '#1a1a1a',
   'tertiaryBorderColor': '#28A745',
-  'noteBkgColor': '#D0EFFF',
+  'noteBkgColor': 'rgba(0, 170, 255, 1)',
   'noteTextColor': '#1a1a1a',
-  'noteBorderColor': '#17A2B8'
+  'noteBorderColor': '#000000ff'
 }}}%%
 mindmap
   root((LifePilot AI))
