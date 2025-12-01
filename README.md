@@ -138,19 +138,18 @@ graph TB
 
 ### Architecture Diagram
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4F46E5', 'primaryTextColor': '#fff', 'primaryBorderColor': '#4F46E5', 'lineColor': '#6366F1', 'secondaryColor': '#10B981', 'tertiaryColor': '#F59E0B', 'background': '#1F2937', 'mainBkg': '#4F46E5', 'secondBkg': '#10B981', 'tertiaryBkg': '#F59E0B'}}}%%
 mindmap
   root((LifePilot AI))
-    Core_Orchestration
+    Core_Orchestration:::orangeClass
       MultiAgentOrchestrator
         Workflow_Management
         State_Machine
         A2A_Protocol
-    Entry_Point
+    Entry_Point:::greenClass
       RouterAgent
         Intent_Detection
         Direct_Dispatch
-    Specialized_Agents
+    Specialized_Agents:::purpleClass
       PlannerAgent
         LLMService
       ExecutorAgent
@@ -168,7 +167,7 @@ mindmap
         Notification_Checks
       UIAgent
         Dashboard_Generation
-    Memory_System
+    Memory_System:::blueClass
       MemoryBank
         Pinecone_Vector_DB
         Semantic_Search
@@ -176,11 +175,17 @@ mindmap
         Conversation_History
       ContextCompactor
         Token_Management
-    Observability
+    Observability:::redClass
       ObservabilityManager
         OpenTelemetry_Tracing
         Structlog_Logging
         System_Metrics
+        
+    classDef orangeClass fill:#F59E0B,stroke:#D97706,stroke-width:2px,color:#000
+    classDef greenClass fill:#10B981,stroke:#059669,stroke-width:2px,color:#000
+    classDef purpleClass fill:#8B5CF6,stroke:#7C3AED,stroke-width:2px,color:#fff
+    classDef blueClass fill:#3B82F6,stroke:#2563EB,stroke-width:2px,color:#fff
+    classDef redClass fill:#EF4444,stroke:#DC2626,stroke-width:2px,color:#fff
 ```
 
 ### Core Components
