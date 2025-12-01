@@ -1,6 +1,6 @@
 # LifePilot: AI-Powered Personal Growth Architect 🚀
 
-![LifePilot Banner](https://img.shields.io/badge/Status-Live-green) ![Gemini](https://img.shields.io/badge/AI-Gemini_Flash-blue) ![Agentic](https://img.shields.io/badge/Architecture-Multi--Agent-purple) [![Live Demo](https://img.shields.io/badge/Live-Demo-667eea?style=for-the-badge&logo=vercel&logoColor=white)](https://lifepilot-nine.vercel.app/)
+![LifePilot Banner](https://img.shields.io/badge/Status-Live-green) ![Gemini](https://img.shields.io/badge/AI-Gemini_Flash-blue) ![Agentic](https://img.shields.io/badge/Architecture-Multi--Agent-purple) <div align="right">[![Live Demo](https://img.shields.io/badge/Live-Demo-667eea?style=for-the-badge&logo=vercel&logoColor=white)](https://lifepilot-nine.vercel.app/)</div>
 
 **LifePilot** is an intelligent, agentic productivity system designed to act as your personal life architect. Unlike passive to-do lists, LifePilot uses a **Multi-Agent System (MAS)** powered by **Google Gemini** to actively plan, schedule, and manage your life.
 
