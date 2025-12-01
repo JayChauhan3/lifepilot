@@ -44,6 +44,92 @@ LifePilot bridges the gap between *knowing* and *doing*.
 
 LifePilot employs a Hub-and-Spoke Agentic Architecture.
 
+### Full-Stack Application Architecture
+
+```mermaid
+graph TB
+    subgraph "Frontend - Next.js 14"
+        UI[User Interface]
+        Pages[Pages/Routes]
+        Components[React Components]
+        Store[Zustand State Management]
+        API_Client[API Service Layer]
+    end
+
+    subgraph "Backend - FastAPI"
+        Router[RouterAgent<br/>Entry Point]
+        Orchestrator[MultiAgentOrchestrator<br/>Workflow Manager]
+        
+        subgraph "Specialized Agents"
+            Planner[PlannerAgent<br/>Plan Generation]
+            Executor[ExecutorAgent<br/>Task Execution]
+            Knowledge[KnowledgeAgent<br/>Web Search]
+            Memory[MemoryAgent<br/>Context Management]
+            Routine[RoutineAgent<br/>Background Jobs]
+            Notification[NotificationAgent<br/>Alerts]
+            UIAgent[UIAgent<br/>Dashboard Data]
+        end
+        
+        subgraph "Core Services"
+            LLM[LLM Service<br/>Gemini Flash]
+            Session[Session Service<br/>Context Tracking]
+            MemBank[Memory Bank<br/>RAG Pipeline]
+            Obs[Observability<br/>Tracing/Logging]
+        end
+        
+        subgraph "Tools"
+            Calendar[Calendar Tool]
+            WebSearch[Web Search Tool]
+            Python[Python Executor]
+        end
+    end
+
+    subgraph "External Services"
+        Gemini[Google Gemini API<br/>LLM + Embeddings]
+        Pinecone[Pinecone Vector DB<br/>Long-term Memory]
+        MongoDB[MongoDB Atlas<br/>User Data]
+    end
+
+    UI --> Pages
+    Pages --> Components
+    Components --> Store
+    Store --> API_Client
+    
+    API_Client -->|HTTP/WebSocket| Router
+    Router --> Orchestrator
+    Router --> Planner
+    Router --> Knowledge
+    Router --> Memory
+    
+    Orchestrator --> Planner
+    Orchestrator --> Executor
+    Orchestrator --> Knowledge
+    Orchestrator --> UIAgent
+    
+    Planner --> LLM
+    Planner --> MemBank
+    Knowledge --> WebSearch
+    Knowledge --> MemBank
+    Executor --> Calendar
+    Executor --> Python
+    Memory --> MemBank
+    Routine --> Notification
+    
+    LLM --> Gemini
+    MemBank --> Pinecone
+    MemBank --> Gemini
+    Session --> MongoDB
+    Router --> MongoDB
+    Planner --> MongoDB
+    
+    style UI fill:#4F46E5
+    style Router fill:#10B981
+    style Orchestrator fill:#F59E0B
+    style Gemini fill:#EA4335
+    style Pinecone fill:#00D4AA
+    style MongoDB fill:#47A248
+```
+
 ### System Architecture
 ![LifePilot Architecture](frontend/public/images/architecture.png)
 
