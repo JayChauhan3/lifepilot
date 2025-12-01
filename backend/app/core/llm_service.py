@@ -29,15 +29,8 @@ class GeminiLLM(LLMProvider):
         if self._initialized:
             return
             
-        api_key = os.getenv("GEMINI_API_KEY")
-        
-        # Try loading .env explicitly if key is missing
-        if not api_key:
-            from dotenv import load_dotenv
-            from pathlib import Path
-            env_path = Path(__file__).parent.parent.parent / ".env"
-            load_dotenv(env_path)
-            api_key = os.getenv("GEMINI_API_KEY")
+        from app.config import settings
+        api_key = settings.GEMINI_API_KEY
             
         if not api_key:
             logger.warning("GEMINI_API_KEY not set, using mock responses")
@@ -158,7 +151,8 @@ class LLMService:
     """Main LLM service with provider switching"""
     
     def __init__(self, provider: Optional[str] = None):
-        self.provider_name = provider or os.getenv("LLM_PROVIDER", "mock")
+        from app.config import settings
+        self.provider_name = provider or settings.LLM_PROVIDER
         self._provider = None
         self._initialize_provider()
     
