@@ -65,7 +65,6 @@ class RouterAgent:
             r'remember\s*:\s*',
             r'i\s+have\s+a\s+(meeting|appointment|deadline|task)',
             r'my\s+(preference|habit|routine)',
-            # r'i\s+(prefer|like|enjoy|want|need)', # Too aggressive, causes false positives
             r'store\s+this',
             r'keep\s+in\s+mind'
         ]
@@ -77,10 +76,12 @@ class RouterAgent:
             r'what\s+(about|regarding)',
             r'tell\s+me\s+about\s+my',
             r'what\s+(meetings|deadlines|tasks|preferences)',
-            r'do\s+you\s+remember',
+            r'do\s+(you|u)\s+remember',
             r'show\s+(me\s+)?(my\s+)?(stored\s+)?memor(y|ies)',
             r'list\s+(my\s+)?memor(y|ies)',
-            r'what\s+did\s+i\s+store'
+            r'what\s+did\s+i\s+store',
+            r'any\s+memor(y|ies)',
+            r'what\s+do\s+(you|u)\s+know'
         ]
         
         # Knowledge query patterns
@@ -266,7 +267,7 @@ class RouterAgent:
                     
                     # Check for duplicates by searching existing memories
                     logger.info("Checking for duplicate memories", user_id=user_id, value=clean_value)
-                    existing_memories = self.memory_bank.get_all_memories(user_id)
+                    existing_memories = await self.memory_bank.get_all_memories(user_id)
                     
                     # Check if exact same memory already exists (case-insensitive comparison)
                     clean_value_lower = clean_value.lower().strip()
@@ -313,7 +314,7 @@ class RouterAgent:
                 
                 try:
                     # Get only user-stored memories to avoid system logs/chat history
-                    user_memories_dict = self.memory_bank.get_memories_by_category(user_id, "user_stored")
+                    user_memories_dict = await self.memory_bank.get_memories_by_category(user_id, "user_stored")
                     
                     # Clean up and format
                     user_memories = []

@@ -12,7 +12,8 @@ logger = structlog.get_logger()
 class MemoryAgent:
     def __init__(self):
         logger.info("MemoryAgent initialized")
-        self.memory_bank = MemoryBank()
+        from ..core.memory_bank import get_memory_bank
+        self.memory_bank = get_memory_bank()
         self.llm_service = get_llm_service()
     
     async def store_memory(self, user_id: str, key: str, value: Any, category: str = "general") -> AgentMessage:
@@ -20,7 +21,7 @@ class MemoryAgent:
         logger.info("Storing memory", user_id=user_id, key=key, category=category)
         
         # Store in memory bank (includes vector DB)
-        success = self.memory_bank.store_memory(user_id, key, value, category)
+        success = await self.memory_bank.store_memory(user_id, key, value, category)
         
         if success:
             memory_payload = MemoryPayload(
@@ -66,7 +67,7 @@ class MemoryAgent:
         logger.info("Retrieving memory", user_id=user_id, key=key)
         
         # Retrieve from memory bank
-        value = self.memory_bank.get_memory(user_id, key)
+        value = await self.memory_bank.get_memory(user_id, key)
         
         if value is not None:
             memory_payload = MemoryPayload(

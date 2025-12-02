@@ -18,6 +18,16 @@ class MemoryBank:
         self.memories: Dict[str, Dict[str, Any]] = {}
         self.global_memory: Dict[str, Any] = {}
         
+        # Database setup
+        from .database import get_database
+        self.db = get_database()
+        self.collection = None
+        if self.db is not None:
+            self.collection = self.db.memories
+            logger.info("MongoDB memories collection initialized")
+        else:
+            logger.warning("MongoDB not available, falling back to in-memory storage")
+        
         # Vector DB setup
         self.vector_db_provider = os.getenv("VECTOR_DB_PROVIDER", "pinecone")
         self.embeddings = get_embeddings()
@@ -27,6 +37,10 @@ class MemoryBank:
         
         # Initialize vector DB
         self._initialize_vector_db()
+        
+        # Load memories from DB if available
+        # We don't load everything into RAM at start to avoid memory issues with large datasets
+        # Instead we'll query on demand
     
     def _initialize_vector_db(self):
         """Initialize vector database client"""
@@ -53,53 +67,131 @@ class MemoryBank:
             self._vector_client = None
             self._vector_index = None
     
-    def store_memory(self, user_id: str, key: str, value: Any, category: str = "general") -> bool:
+    async def store_memory(self, user_id: str, key: str, value: Any, category: str = "general") -> bool:
         """Store a memory with category and timestamp"""
         try:
-            if user_id not in self.memories:
-                self.memories[user_id] = {}
-            
             memory_entry = {
                 "value": value,
                 "category": category,
                 "created_at": datetime.now(),
-                "updated_at": datetime.now()
+                "updated_at": datetime.now(),
+                "user_id": user_id,
+                "key": key
             }
             
+            # Update in-memory cache
+            if user_id not in self.memories:
+                self.memories[user_id] = {}
             self.memories[user_id][key] = memory_entry
-            logger.info("Memory stored", user_id=user_id, key=key, category=category)
             
-            # Store in vector DB if available
-            if self._vector_client:
-                self._upsert_memory_vector(user_id, key, value, category)
+            # Store in MongoDB
+            if self.collection is not None:
+                await self.collection.update_one(
+                    {"user_id": user_id, "key": key},
+                    {"$set": memory_entry},
+                    upsert=True
+                )
+                logger.info("Memory stored in MongoDB", user_id=user_id, key=key)
+            
+            # Store in Vector DB if applicable
+            if self._vector_index and isinstance(value, str):
+                try:
+                    vector = self.embeddings.get_embedding(value)
+                    self._vector_index.upsert(vectors=[(
+                        f"{user_id}_{key}",
+                        vector,
+                        {"user_id": user_id, "category": category, "content": value}
+                    )])
+                except Exception as e:
+                    logger.error("Failed to store in vector DB", error=str(e))
             
             return True
         except Exception as e:
-            logger.error("Failed to store memory", user_id=user_id, key=key, error=str(e))
+            logger.error("Failed to store memory", error=str(e))
             return False
     
-    def get_memory(self, user_id: str, key: str) -> Optional[Any]:
+    async def get_memory(self, user_id: str, key: str) -> Optional[Any]:
         """Retrieve a specific memory"""
+        # Try cache first
         if user_id in self.memories and key in self.memories[user_id]:
-            memory_entry = self.memories[user_id][key]
-            logger.info("Memory retrieved", user_id=user_id, key=key)
-            return memory_entry["value"]
-        
-        logger.info("Memory not found", user_id=user_id, key=key)
+            return self.memories[user_id][key]["value"]
+            
+        # Try MongoDB
+        if self.collection is not None:
+            doc = await self.collection.find_one({"user_id": user_id, "key": key})
+            if doc:
+                # Update cache
+                if user_id not in self.memories:
+                    self.memories[user_id] = {}
+                self.memories[user_id][key] = doc
+                return doc["value"]
+            
         return None
-    
-    def get_memories_by_category(self, user_id: str, category: str) -> Dict[str, Any]:
+
+    async def get_memories_by_category(self, user_id: str, category: str) -> Dict[str, Any]:
         """Get all memories in a category for a user"""
-        if user_id not in self.memories:
-            return {}
-        
         filtered_memories = {}
-        for key, memory_entry in self.memories[user_id].items():
-            if memory_entry["category"] == category:
-                filtered_memories[key] = memory_entry["value"]
+        
+        # Try MongoDB first (source of truth)
+        if self.collection is not None:
+            cursor = self.collection.find({"user_id": user_id, "category": category})
+            async for doc in cursor:
+                filtered_memories[doc["key"]] = doc["value"]
+                # Update cache
+                if user_id not in self.memories:
+                    self.memories[user_id] = {}
+                self.memories[user_id][doc["key"]] = doc
+        else:
+            # Fallback to cache
+            if user_id in self.memories:
+                for key, memory_entry in self.memories[user_id].items():
+                    if memory_entry["category"] == category:
+                        filtered_memories[key] = memory_entry["value"]
         
         logger.info("Memories retrieved by category", user_id=user_id, category=category, count=len(filtered_memories))
         return filtered_memories
+    
+    async def get_all_memories(self, user_id: str) -> Dict[str, Any]:
+        """Get all memories for a user"""
+        all_memories = {}
+        
+        # Try MongoDB
+        if self.collection is not None:
+            cursor = self.collection.find({"user_id": user_id})
+            async for doc in cursor:
+                all_memories[doc["key"]] = doc["value"]
+                # Update cache
+                if user_id not in self.memories:
+                    self.memories[user_id] = {}
+                self.memories[user_id][doc["key"]] = doc
+        else:
+            # Fallback to cache
+            if user_id in self.memories:
+                for key, memory_entry in self.memories[user_id].items():
+                    all_memories[key] = memory_entry["value"]
+        
+        logger.info("All memories retrieved", user_id=user_id, count=len(all_memories))
+        return all_memories
+    
+    async def delete_memory(self, user_id: str, key: str) -> bool:
+        """Delete a specific memory"""
+        success = False
+        
+        # Delete from MongoDB
+        if self.collection is not None:
+            result = await self.collection.delete_one({"user_id": user_id, "key": key})
+            if result.deleted_count > 0:
+                success = True
+        
+        # Delete from cache
+        if user_id in self.memories and key in self.memories[user_id]:
+            del self.memories[user_id][key]
+            success = True
+            
+        if success:
+            logger.info("Memory deleted", user_id=user_id, key=key)
+            
+        return success
     
     def get_all_memories(self, user_id: str) -> Dict[str, Any]:
         """Get all memories for a user"""
