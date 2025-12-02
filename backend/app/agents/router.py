@@ -249,7 +249,13 @@ class RouterAgent:
                 # For now, store the full message as a memory
                 memory_key = f"memory_{int(time.time())}"
                 memory_response = await self.memory.store_memory(user_id, memory_key, message, "user_stored")
-                final_response = memory_response.payload.get("response", "Memory stored successfully.")
+                
+                # Check if storage was successful
+                if memory_response.payload.get("action") == "stored":
+                    final_response = "✅ Memory stored successfully! I'll remember that."
+                else:
+                    final_response = "❌ Failed to store memory. Please try again."
+                
                 logger.info("Memory storage completed", user_id=user_id, memory_key=memory_key)
                 
             elif message_type == "memory_retrieve":

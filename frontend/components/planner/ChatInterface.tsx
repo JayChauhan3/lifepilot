@@ -251,6 +251,14 @@ export default function ChatInterface() {
                                         li: ({ node, ...props }) => <li className="text-gray-700 ml-2" {...props} />,
                                         p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
                                         strong: ({ node, ...props }) => <strong className="font-semibold text-gray-900" {...props} />,
+                                        a: ({ node, ...props }) => (
+                                            <a
+                                                className="text-primary-600 hover:text-primary-700 underline font-medium transition-colors"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                {...props}
+                                            />
+                                        ),
                                         code: ({ node, inline, ...props }: any) => {
                                             return inline ? (
                                                 <code className="bg-gray-100 rounded px-1.5 py-0.5 text-sm border border-gray-200 text-gray-800" {...props} />
