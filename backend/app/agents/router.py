@@ -268,14 +268,14 @@ class RouterAgent:
                     logger.info("Checking for duplicate memories", user_id=user_id, value=clean_value)
                     existing_memories = self.memory_bank.get_all_memories(user_id)
                     
-                    # Check if similar memory already exists (case-insensitive comparison)
+                    # Check if exact same memory already exists (case-insensitive comparison)
                     clean_value_lower = clean_value.lower().strip()
                     is_duplicate = False
                     
                     for key, existing_value in existing_memories.items():
                         existing_lower = str(existing_value).lower().strip()
-                        # Check for exact match or very similar content
-                        if clean_value_lower == existing_lower or clean_value_lower in existing_lower or existing_lower in clean_value_lower:
+                        # Only check for EXACT match, not substring
+                        if clean_value_lower == existing_lower:
                             is_duplicate = True
                             logger.info("Duplicate memory detected", user_id=user_id, existing_key=key, new_value=clean_value)
                             break
