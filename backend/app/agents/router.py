@@ -312,16 +312,12 @@ class RouterAgent:
                 tools_used = ["memory_bank", "vector_search"]
                 
                 try:
-                    # Get all memories directly from memory bank to filter properly
-                    all_memories = self.memory_bank.get_all_memories(user_id)
+                    # Get only user-stored memories to avoid system logs/chat history
+                    user_memories_dict = self.memory_bank.get_memories_by_category(user_id, "user_stored")
                     
-                    # Filter for user_stored category and clean up
+                    # Clean up and format
                     user_memories = []
-                    for key, value in all_memories.items():
-                        # Skip system logs or interaction history
-                        if isinstance(value, dict) and 'user_message' in value:
-                            continue
-                            
+                    for key, value in user_memories_dict.items():
                         # Format the memory value
                         memory_text = str(value)
                         # Capitalize first letter
