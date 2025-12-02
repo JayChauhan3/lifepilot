@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { FiClock, FiBriefcase, FiCoffee, FiShoppingBag, FiMoon, FiActivity, FiAlertCircle, FiCheckCircle, FiSun, FiBook } from "react-icons/fi";
+import { FiClock, FiBriefcase, FiCoffee, FiShoppingBag, FiMoon, FiActivity, FiAlertCircle, FiCheckCircle, FiSun, FiBook, FiArrowRight } from "react-icons/fi";
+import Link from "next/link";
 import clsx from "clsx";
 import { usePlannerStore } from "../../store/plannerStore";
 import { Task, Routine } from "../../types/planner";
@@ -180,9 +181,9 @@ export default function TodayPlan() {
         <div className="bg-white rounded-2xl p-6 shadow-soft border border-gray-100 h-full overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-bold text-gray-900">Today's Plan</h2>
-                <button className="text-sm text-primary-600 font-medium hover:text-primary-700">
-                    View Full
-                </button>
+                <Link href="/tasks" className="text-primary-600 hover:text-primary-700 transition-colors p-1 hover:bg-primary-50 rounded-full">
+                    <FiArrowRight size={20} />
+                </Link>
             </div>
 
             <div className="relative">
