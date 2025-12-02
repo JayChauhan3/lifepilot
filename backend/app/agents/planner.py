@@ -7,6 +7,7 @@ from ..schemas import AgentMessage, PlanPayload
 from ..core.llm_service import get_llm_service
 from ..core.memory_bank import MemoryBank
 from ..core.context_compactor import get_compactor
+from ..tools.web_search_tool import WebSearchTool
 
 logger = structlog.get_logger()
 
@@ -16,10 +17,41 @@ class PlannerAgent:
         self.llm_service = get_llm_service()
         self.memory_bank = MemoryBank()
         self.compactor = get_compactor()
+        self.web_search_tool = WebSearchTool()
     
     async def create_plan(self, user_message: str, user_id: str = "default", context: Dict[str, Any] = None) -> AgentMessage:
         """Create a plan based on user message using RAG"""
         logger.info("Creating plan", user_message=user_message, user_id=user_id)
+        
+        # Detect if user is requesting resources (YouTube, blogs, articles, tutorials)
+        resource_keywords = ["youtube", "video", "blog", "article", "tutorial", "resource", "recommend", "suggestion", "link"]
+        needs_resources = any(keyword in user_message.lower() for keyword in resource_keywords)
+        
+        resource_links = ""
+        if needs_resources:
+            logger.info("Resource request detected, searching for resources", user_message=user_message)
+            try:
+                # Search for resources related to the user's request
+                search_query = user_message + " tutorial blog youtube"
+                search_results = await self.web_search_tool.search(search_query, max_results=5)
+                
+                if search_results and len(search_results) > 0:
+                    # Format search results as Markdown links
+                    formatted_links = []
+                    for result in search_results:
+                        if isinstance(result, dict):
+                            title = result.get('title', 'Resource')
+                            url = result.get('url', '#')
+                            snippet = result.get('snippet', '')
+                            formatted_links.append(f"- [{title}]({url})\n  _{snippet}_")
+                    
+                    if formatted_links:
+                        resource_links = "\n\n**📚 Recommended Resources:**\n\n" + "\n\n".join(formatted_links)
+                        logger.info("Found resources", count=len(formatted_links))
+                else:
+                    logger.info("No resources found from search")
+            except Exception as e:
+                logger.error("Failed to search for resources", error=str(e))
         
         # Retrieve relevant context using RAG
         context = self.memory_bank.retrieve_relevant_context(user_id, user_message, k=5)
@@ -77,6 +109,10 @@ class PlannerAgent:
                 user_message, 
                 full_context  # Now includes both memory and conversation history
             )
+            
+            # Append resource links if found
+            if resource_links:
+                raw_response += resource_links
             
             logger.info("Plan generated successfully", response_length=len(raw_response))
             
