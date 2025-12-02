@@ -312,29 +312,32 @@ class RouterAgent:
                 tools_used = ["memory_bank", "vector_search"]
                 
                 try:
-                    # Handle memory retrieval - search for relevant memories
-                    retrieval_response = await self.memory.search_similar_memories(user_id, message, k=5)
-                    memories = retrieval_response.payload.get("memory_value", [])
-                    summary = retrieval_response.payload.get("summary", "")
+                    # Get all memories directly from memory bank to filter properly
+                    all_memories = self.memory_bank.get_all_memories(user_id)
                     
-                    if memories:
-                        # Format memories nicely
-                        formatted_memories = []
-                        for i, memory in enumerate(memories, 1):
-                            if isinstance(memory, dict):
-                                content = memory.get("content", str(memory))
-                                formatted_memories.append(f"{i}. {content}")
-                            else:
-                                formatted_memories.append(f"{i}. {memory}")
+                    # Filter for user_stored category and clean up
+                    user_memories = []
+                    for key, value in all_memories.items():
+                        # Skip system logs or interaction history
+                        if isinstance(value, dict) and 'user_message' in value:
+                            continue
+                            
+                        # Format the memory value
+                        memory_text = str(value)
+                        # Capitalize first letter
+                        if memory_text and memory_text[0].islower():
+                            memory_text = memory_text[0].upper() + memory_text[1:]
                         
-                        if summary:
-                            final_response = f"**📝 Here's what I remember:**\n\n{summary}\n\n**Details:**\n" + "\n".join(formatted_memories)
-                        else:
-                            final_response = f"**📝 Here's what I remember:**\n\n" + "\n".join(formatted_memories)
+                        user_memories.append(memory_text)
+                    
+                    if user_memories:
+                        # Simple, clean format like ChatGPT
+                        formatted_list = "\n".join([f"• {mem}" for mem in user_memories])
+                        final_response = f"**Here's what I remember about you:**\n\n{formatted_list}"
                         
-                        logger.info("Memory retrieval completed", user_id=user_id, memories_count=len(memories))
+                        logger.info("Memory retrieval completed", user_id=user_id, memories_count=len(user_memories))
                     else:
-                        final_response = "I don't have any relevant memories about that. You can ask me to remember things by saying 'Remember that...'."
+                        final_response = "I don't have any specific memories stored about you yet. You can ask me to remember things by saying 'Remember that...'."
                         logger.info("No relevant memories found", user_id=user_id)
                         
                 except Exception as e:
