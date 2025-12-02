@@ -70,11 +70,10 @@ class RouterAgent:
             r'keep\s+in\s+mind'
         ]
         
-        # Memory retrieval patterns
+        # Memory retrieval patterns (removed 'remember\s+that\s+i' to avoid conflict with storage)
         retrieval_patterns = [
             r'what\s+(do\s+you\s+know|can\s+you\s+tell\s+me)',
             r'what\s+(have\s+i\s+told|did\s+i\s+say)',
-            r'remember\s+that\s+i',
             r'what\s+(about|regarding)',
             r'tell\s+me\s+about\s+my',
             r'what\s+(meetings|deadlines|tasks|preferences)',
@@ -176,27 +175,27 @@ class RouterAgent:
         ]
         
         # Check patterns in priority order
+        # IMPORTANT: Check Memory Storage BEFORE Memory Retrieval to avoid conflicts
         
-        # 1. Planning (Highest priority - specific intent)
+        # 1. Memory Storage (Highest priority for "remember that" pattern)
+        for pattern in memory_patterns:
+            if re.search(pattern, message_lower):
+                return "memory_store"
+        
+        # 2. Planning (High priority - specific intent)
         for pattern in planning_patterns:
             if re.search(pattern, message_lower):
                 return "planning_request"
 
-        # 2. Knowledge Search (Specific intent)
+        # 3. Knowledge Search (Specific intent)
         for pattern in knowledge_patterns:
             if re.search(pattern, message_lower):
                 return "knowledge_search"
 
-        # 3. Memory Retrieval (Specific intent)
+        # 4. Memory Retrieval (After storage check)
         for pattern in retrieval_patterns:
             if re.search(pattern, message_lower):
                 return "memory_retrieve"
-
-        # 4. Memory Storage (Lower priority - can be ambiguous with "my routine")
-        # Removed aggressive pattern r'i\s+(prefer|like|enjoy|want|need)' to avoid false positives like "I want a table"
-        for pattern in memory_patterns:
-            if re.search(pattern, message_lower):
-                return "memory_store"
                 
         # 5. Context Continuation
         for pattern in context_patterns:
