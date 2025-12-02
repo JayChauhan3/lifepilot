@@ -245,37 +245,65 @@ class RouterAgent:
                 logger.info("Processing memory storage", user_id=user_id)
                 agent_used = "memory_agent"
                 tools_used = ["memory_bank", "vector_store"]
-                # Handle memory storage - extract key and value from message
-                # For now, store the full message as a memory
-                memory_key = f"memory_{int(time.time())}"
-                memory_response = await self.memory.store_memory(user_id, memory_key, message, "user_stored")
                 
-                # Check if storage was successful
-                if memory_response.payload.get("action") == "stored":
-                    final_response = "✅ Memory stored successfully! I'll remember that."
-                else:
-                    final_response = "❌ Failed to store memory. Please try again."
-                
-                logger.info("Memory storage completed", user_id=user_id, memory_key=memory_key)
+                try:
+                    # Handle memory storage - extract key and value from message
+                    # For now, store the full message as a memory
+                    memory_key = f"memory_{int(time.time())}"
+                    logger.info("Calling memory agent to store", user_id=user_id, key=memory_key, message=message)
+                    
+                    memory_response = await self.memory.store_memory(user_id, memory_key, message, "user_stored")
+                    
+                    logger.info("Memory agent response received", payload=memory_response.payload)
+                    
+                    # Check if storage was successful
+                    if memory_response.payload.get("action") == "stored":
+                        final_response = "✅ Memory stored successfully! I'll remember that."
+                    else:
+                        final_response = "❌ Failed to store memory. Please try again."
+                    
+                    logger.info("Memory storage completed", user_id=user_id, memory_key=memory_key, success=memory_response.payload.get("action") == "stored")
+                    
+                except Exception as e:
+                    logger.error("Error in memory storage", user_id=user_id, error=str(e), error_type=type(e).__name__)
+                    import traceback
+                    logger.error("Memory storage traceback", traceback=traceback.format_exc())
+                    final_response = f"❌ Error storing memory: {str(e)}"
                 
             elif message_type == "memory_retrieve":
                 logger.info("Processing memory retrieval", user_id=user_id)
                 agent_used = "memory_agent"
                 tools_used = ["memory_bank", "vector_search"]
-                # Handle memory retrieval - search for relevant memories
-                retrieval_response = await self.memory.search_similar_memories(user_id, message, k=5)
-                memories = retrieval_response.payload.get("memory_value", [])
-                summary = retrieval_response.payload.get("summary", "")
                 
-                if memories:
-                    if summary:
-                        final_response = f"{summary}\n\nRelevant memories:\n{chr(10).join(memories)}"
+                try:
+                    # Handle memory retrieval - search for relevant memories
+                    retrieval_response = await self.memory.search_similar_memories(user_id, message, k=5)
+                    memories = retrieval_response.payload.get("memory_value", [])
+                    summary = retrieval_response.payload.get("summary", "")
+                    
+                    if memories:
+                        # Format memories nicely
+                        formatted_memories = []
+                        for i, memory in enumerate(memories, 1):
+                            if isinstance(memory, dict):
+                                content = memory.get("content", str(memory))
+                                formatted_memories.append(f"{i}. {content}")
+                            else:
+                                formatted_memories.append(f"{i}. {memory}")
+                        
+                        if summary:
+                            final_response = f"**📝 Here's what I remember:**\n\n{summary}\n\n**Details:**\n" + "\n".join(formatted_memories)
+                        else:
+                            final_response = f"**📝 Here's what I remember:**\n\n" + "\n".join(formatted_memories)
+                        
+                        logger.info("Memory retrieval completed", user_id=user_id, memories_count=len(memories))
                     else:
-                        final_response = f"Found relevant memories:\n{chr(10).join(memories)}"
-                    logger.info("Memory retrieval completed", user_id=user_id, memories_count=len(memories))
-                else:
-                    final_response = "I don't have any relevant memories about that."
-                    logger.info("No relevant memories found", user_id=user_id)
+                        final_response = "I don't have any relevant memories about that. You can ask me to remember things by saying 'Remember that...'."
+                        logger.info("No relevant memories found", user_id=user_id)
+                        
+                except Exception as e:
+                    logger.error("Error in memory retrieval", user_id=user_id, error=str(e))
+                    final_response = f"❌ Error retrieving memories: {str(e)}"
                     
             elif message_type == "knowledge_search":
                 logger.info("Processing knowledge search", user_id=user_id)
