@@ -77,7 +77,10 @@ class RouterAgent:
             r'what\s+(about|regarding)',
             r'tell\s+me\s+about\s+my',
             r'what\s+(meetings|deadlines|tasks|preferences)',
-            r'do\s+you\s+remember'
+            r'do\s+you\s+remember',
+            r'show\s+(me\s+)?(my\s+)?(stored\s+)?memor(y|ies)',
+            r'list\s+(my\s+)?memor(y|ies)',
+            r'what\s+did\s+i\s+store'
         ]
         
         # Knowledge query patterns
@@ -246,22 +249,56 @@ class RouterAgent:
                 tools_used = ["memory_bank", "vector_store"]
                 
                 try:
-                    # Handle memory storage - extract key and value from message
-                    # For now, store the full message as a memory
-                    memory_key = f"memory_{int(time.time())}"
-                    logger.info("Calling memory agent to store", user_id=user_id, key=memory_key, message=message)
+                    # Extract clean data from the message
+                    # Remove common prefixes like "Remember that", "Remember:", "Store this:", etc.
+                    clean_value = message
                     
-                    memory_response = await self.memory.store_memory(user_id, memory_key, message, "user_stored")
+                    # Remove "Remember that I" or "Remember that" prefix
+                    clean_value = re.sub(r'^remember\s+that\s+i\s+', '', clean_value, flags=re.IGNORECASE)
+                    clean_value = re.sub(r'^remember\s+that\s+', '', clean_value, flags=re.IGNORECASE)
+                    clean_value = re.sub(r'^remember:\s*', '', clean_value, flags=re.IGNORECASE)
+                    clean_value = re.sub(r'^store\s+this:\s*', '', clean_value, flags=re.IGNORECASE)
+                    clean_value = re.sub(r'^keep\s+in\s+mind:\s*', '', clean_value, flags=re.IGNORECASE)
                     
-                    logger.info("Memory agent response received", payload=memory_response.payload)
+                    # Capitalize first letter if needed
+                    if clean_value and clean_value[0].islower():
+                        clean_value = clean_value[0].upper() + clean_value[1:]
                     
-                    # Check if storage was successful
-                    if memory_response.payload.get("action") == "stored":
-                        final_response = "✅ Memory stored successfully! I'll remember that."
+                    # Check for duplicates by searching existing memories
+                    logger.info("Checking for duplicate memories", user_id=user_id, value=clean_value)
+                    existing_memories = self.memory_bank.get_all_memories(user_id)
+                    
+                    # Check if similar memory already exists (case-insensitive comparison)
+                    clean_value_lower = clean_value.lower().strip()
+                    is_duplicate = False
+                    
+                    for key, existing_value in existing_memories.items():
+                        existing_lower = str(existing_value).lower().strip()
+                        # Check for exact match or very similar content
+                        if clean_value_lower == existing_lower or clean_value_lower in existing_lower or existing_lower in clean_value_lower:
+                            is_duplicate = True
+                            logger.info("Duplicate memory detected", user_id=user_id, existing_key=key, new_value=clean_value)
+                            break
+                    
+                    if is_duplicate:
+                        final_response = f"ℹ️ I already remember that you: {clean_value.lower()}. No need to store it again!"
+                        logger.info("Skipped duplicate memory storage", user_id=user_id)
                     else:
-                        final_response = "❌ Failed to store memory. Please try again."
-                    
-                    logger.info("Memory storage completed", user_id=user_id, memory_key=memory_key, success=memory_response.payload.get("action") == "stored")
+                        # Store new memory
+                        memory_key = f"memory_{int(time.time())}"
+                        logger.info("Storing cleaned memory", user_id=user_id, key=memory_key, original=message, cleaned=clean_value)
+                        
+                        memory_response = await self.memory.store_memory(user_id, memory_key, clean_value, "user_stored")
+                        
+                        logger.info("Memory agent response received", payload=memory_response.payload)
+                        
+                        # Check if storage was successful
+                        if memory_response.payload.get("action") == "stored":
+                            final_response = f"✅ Memory stored successfully! I'll remember that you: {clean_value.lower()}"
+                        else:
+                            final_response = "❌ Failed to store memory. Please try again."
+                        
+                        logger.info("Memory storage completed", user_id=user_id, memory_key=memory_key, success=memory_response.payload.get("action") == "stored")
                     
                 except Exception as e:
                     logger.error("Error in memory storage", user_id=user_id, error=str(e), error_type=type(e).__name__)
