@@ -193,26 +193,7 @@ class MemoryBank:
             
         return success
     
-    def get_all_memories(self, user_id: str) -> Dict[str, Any]:
-        """Get all memories for a user"""
-        if user_id not in self.memories:
-            return {}
-        
-        # Return only values, not metadata
-        all_memories = {}
-        for key, memory_entry in self.memories[user_id].items():
-            all_memories[key] = memory_entry["value"]
-        
-        logger.info("All memories retrieved", user_id=user_id, count=len(all_memories))
-        return all_memories
-    
-    def delete_memory(self, user_id: str, key: str) -> bool:
-        """Delete a specific memory"""
-        if user_id in self.memories and key in self.memories[user_id]:
-            del self.memories[user_id][key]
-            logger.info("Memory deleted", user_id=user_id, key=key)
-            return True
-        return False
+
     
     def store_global_memory(self, key: str, value: Any) -> bool:
         """Store global memory accessible to all agents"""
