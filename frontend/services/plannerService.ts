@@ -446,7 +446,7 @@ export const plannerService = {
     },
 
     // Chat operation
-    async chat(message: string): Promise<any> {
+    async chat(message: string, options?: RequestInit): Promise<any> {
         // For now, use 'default' as user_id
         // TODO: Get actual user_id from getCurrentUser() when needed
         const userId = 'default';
@@ -458,6 +458,7 @@ export const plannerService = {
                 user_id: userId,
                 message: message
             }),
+            ...options, // Spread options to include signal if provided
         });
 
         if (!response.ok) {

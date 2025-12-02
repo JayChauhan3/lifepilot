@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiSend, FiUser, FiCpu, FiMic } from "react-icons/fi";
+import { FiSend, FiUser, FiCpu, FiMic, FiSquare } from "react-icons/fi";
 import clsx from "clsx";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -30,6 +30,7 @@ export default function ChatInterface() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const recognitionRef = useRef<any>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -117,9 +118,14 @@ export default function ChatInterface() {
             textareaRef.current.style.height = 'auto';
         }
 
+        // Create new AbortController for this request
+        abortControllerRef.current = new AbortController();
+
         try {
-            // Call backend API
-            const response = await plannerService.chat(inputValue);
+            // Call backend API with abort signal
+            const response = await plannerService.chat(inputValue, {
+                signal: abortControllerRef.current.signal
+            });
 
             setIsTyping(false);
             setMessages((prev) => [
@@ -131,7 +137,14 @@ export default function ChatInterface() {
                     timestamp: new Date(),
                 },
             ]);
-        } catch (error) {
+        } catch (error: any) {
+            // Don't show error if request was aborted by user
+            if (error.name === 'AbortError') {
+                console.log('Request aborted by user');
+                setIsTyping(false);
+                return;
+            }
+
             console.error('Chat error:', error);
             setIsTyping(false);
             setMessages((prev) => [
@@ -143,7 +156,17 @@ export default function ChatInterface() {
                     timestamp: new Date(),
                 },
             ]);
+        } finally {
+            abortControllerRef.current = null;
         }
+    };
+
+    const handleStopGeneration = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        setIsTyping(false);
     };
 
     const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -300,18 +323,28 @@ export default function ChatInterface() {
                                 <FiMic size={16} />
                                 {isListening && <span className="text-xs">Listening...</span>}
                             </button>
-                            <button
-                                onClick={handleSendMessage}
-                                disabled={!inputValue.trim() || isTyping}
-                                className={clsx(
-                                    "p-2 rounded-xl transition-all duration-200 flex items-center justify-center shadow-sm",
-                                    inputValue.trim() && !isTyping
-                                        ? "bg-primary-600 text-white hover:bg-primary-700 hover:scale-105"
-                                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                )}
-                            >
-                                <FiSend size={18} className={clsx(inputValue.trim() && !isTyping && "ml-0.5")} />
-                            </button>
+                            {isTyping ? (
+                                <button
+                                    onClick={handleStopGeneration}
+                                    className="p-2 rounded-xl transition-all duration-200 flex items-center justify-center shadow-sm bg-red-500 text-white hover:bg-red-600 hover:scale-105"
+                                    title="Stop generating"
+                                >
+                                    <FiSquare size={18} />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleSendMessage}
+                                    disabled={!inputValue.trim()}
+                                    className={clsx(
+                                        "p-2 rounded-xl transition-all duration-200 flex items-center justify-center shadow-sm",
+                                        inputValue.trim()
+                                            ? "bg-primary-600 text-white hover:bg-primary-700 hover:scale-105"
+                                            : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                    )}
+                                >
+                                    <FiSend size={18} className={clsx(inputValue.trim() && "ml-0.5")} />
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
