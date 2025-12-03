@@ -109,7 +109,7 @@ export class ApiClient {
     }
   }
 
-  async chat(message: string): Promise<ChatResponse> {
+  async chat(message: string, options?: { signal?: AbortSignal }): Promise<ChatResponse> {
     console.log('Making chat request to:', `${this.baseURL}/api/chat`);
     console.log('Request payload:', { user_id: this.userId, message });
 
@@ -119,6 +119,7 @@ export class ApiClient {
         user_id: this.userId,
         message,
       } as ChatRequest),
+      signal: options?.signal,
     });
 
     console.log('Chat response:', response);

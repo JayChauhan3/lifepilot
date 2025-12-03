@@ -34,6 +34,7 @@ interface ChatStore {
   streamingContent: string
   isStreaming: boolean
   error: string | null
+  abortController: AbortController | null
 
   // Actions
   addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void
@@ -67,6 +68,7 @@ export const useChatStore = create<ChatStore>()(
       streamingContent: '',
       isStreaming: false,
       error: null,
+      abortController: null,
 
       // Actions
       addMessage: (message) => {
@@ -109,8 +111,12 @@ export const useChatStore = create<ChatStore>()(
         setLoading(true)
         setError(null)
 
+        // Create new AbortController
+        const abortController = new AbortController()
+        set({ abortController })
+
         try {
-          const response = await apiClient.chat(inputValue)
+          const response = await apiClient.chat(inputValue, { signal: abortController.signal })
           addMessage({
             content: response.response,
             role: 'assistant',
@@ -121,7 +127,11 @@ export const useChatStore = create<ChatStore>()(
             structuredData: response.data,
             showStructuredData: !!response.data,
           })
-        } catch (error) {
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            console.log('Request aborted by user')
+            return
+          }
           console.error('Chat error:', error)
           setError(error instanceof Error ? error.message : 'Failed to send message')
           addMessage({
@@ -130,6 +140,7 @@ export const useChatStore = create<ChatStore>()(
           })
         } finally {
           setLoading(false)
+          set({ abortController: null })
         }
       },
 
@@ -194,7 +205,13 @@ export const useChatStore = create<ChatStore>()(
 
       updateStreamingContent: (content) => set({ streamingContent: content }),
 
-      stopStreaming: () => set({ isStreaming: false, streamingContent: '' }),
+      stopStreaming: () => {
+        const { abortController } = get()
+        if (abortController) {
+          abortController.abort()
+        }
+        set({ isStreaming: false, streamingContent: '', abortController: null })
+      },
 
       setError: (error) => set({ error }),
 
