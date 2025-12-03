@@ -95,12 +95,21 @@ async def chat(request: ChatRequest, req: Request, http_response: Response):
         return ChatResponse(**response_data)
         
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        
         logger.error("❌ [CHAT] Error processing request", 
                      session_id=session_id,
                      user_id=request.user_id, 
                      error=str(e),
-                     error_type=type(e).__name__)
-        raise HTTPException(status_code=500, detail="Internal server error")
+                     error_type=type(e).__name__,
+                     stack_trace=error_trace)
+        
+        # Return more detailed error in development
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Internal server error: {type(e).__name__}: {str(e)}"
+        )
 
 @router.get("/chat/history")
 async def get_chat_history(req: Request):
