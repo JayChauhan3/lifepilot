@@ -216,19 +216,35 @@ export const useChatStore = create<ChatStore>()(
       })),
 
       loadChatHistory: async () => {
+        console.log('🔍 [FRONTEND] loadChatHistory called')
         try {
+          console.log('📡 [FRONTEND] Calling getChatHistory API...')
           const { messages } = await apiClient.getChatHistory()
+          console.log('✅ [FRONTEND] API response received:', {
+            messageCount: messages?.length || 0,
+            messages: messages
+          })
+
           if (messages && messages.length > 0) {
-            set({
-              messages: messages.map(msg => ({
-                ...msg,
-                id: crypto.randomUUID(), // Generate ID if missing
-                timestamp: new Date(msg.timestamp)
-              }))
+            const processedMessages = messages.map(msg => ({
+              ...msg,
+              id: crypto.randomUUID(), // Generate ID if missing
+              timestamp: new Date(msg.timestamp)
+            }))
+
+            console.log('💾 [FRONTEND] Setting messages in store:', {
+              count: processedMessages.length,
+              roles: processedMessages.map(m => m.role)
             })
+
+            set({ messages: processedMessages })
+
+            console.log('🎉 [FRONTEND] Chat history loaded successfully')
+          } else {
+            console.log('ℹ️ [FRONTEND] No messages to load (empty history)')
           }
         } catch (error) {
-          console.error('Failed to load chat history:', error)
+          console.error('❌ [FRONTEND] Failed to load chat history:', error)
         }
       },
     }),

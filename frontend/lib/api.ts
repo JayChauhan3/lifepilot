@@ -221,7 +221,17 @@ export class ApiClient {
   }
 
   async getChatHistory(): Promise<{ messages: any[] }> {
+    console.log('🌐 [API] getChatHistory called')
+    console.log('🌐 [API] Request URL:', `${this.baseURL}/api/chat/history`)
+    console.log('🌐 [API] Credentials:', 'include')
+
     const response = await this.request<{ messages: any[] }>('/api/chat/history');
+
+    console.log('🌐 [API] getChatHistory response:', {
+      messageCount: response.messages?.length || 0,
+      hasMessages: !!response.messages
+    })
+
     return response;
   }
 }
