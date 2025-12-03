@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { devtools, persist, createJSONStorage } from 'zustand/middleware'
+import { devtools } from 'zustand/middleware'
 import { apiClient } from '@/lib/api'
 
 export interface Message {
@@ -76,18 +76,6 @@ export const useChatStore = create<ChatStore>()(
             id: crypto.randomUUID(),
             timestamp: new Date(),
           }
-
-          // Save to database (fire and forget)
-          apiClient.saveChatMessage({
-            id: newMessage.id,
-            content: newMessage.content,
-            role: newMessage.role,
-            timestamp: newMessage.timestamp,
-            agentUsed: newMessage.agentUsed,
-            toolsUsed: newMessage.toolsUsed,
-            processingTime: newMessage.processingTime,
-            messageType: newMessage.messageType,
-          }).catch(err => console.error('Failed to save message to database:', err))
 
           set((state) => ({
             messages: [...state.messages, newMessage],
@@ -230,23 +218,12 @@ export const useChatStore = create<ChatStore>()(
 
         loadChatHistory: async () => {
           try {
-            // First, filter out messages older than 24 hours from localStorage
-            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-            const currentMessages = get().messages.filter(msg =>
-              new Date(msg.timestamp) > twentyFourHoursAgo
-            )
-
-            // Update state with filtered messages
-            if (currentMessages.length !== get().messages.length) {
-              set({ messages: currentMessages })
-            }
-
-            // Then load from database (which also filters to 24 hours)
             const { messages } = await apiClient.getChatHistory()
             if (messages && messages.length > 0) {
               set({
                 messages: messages.map(msg => ({
                   ...msg,
+                  id: crypto.randomUUID(), // Generate ID if missing
                   timestamp: new Date(msg.timestamp)
                 }))
               })
@@ -255,14 +232,10 @@ export const useChatStore = create<ChatStore>()(
             console.error('Failed to load chat history:', error)
           }
         },
-      }),
-      {
-        name: 'chat-storage',
-        storage: createJSONStorage(() => localStorage),
-      }
-    ),
-    {
-      name: 'chat-store',
+      },
+    }),
+{
+  name: 'Chat Store',
     }
   )
 )

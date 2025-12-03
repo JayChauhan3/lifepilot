@@ -83,6 +83,7 @@ export class ApiClient {
       const response = await fetch(url, {
         ...options,
         headers,
+        credentials: 'include', // Ensure cookies are sent
       });
 
       console.log('Response status:', response.status, response.statusText);
@@ -172,6 +173,7 @@ export class ApiClient {
     const response = await fetch(url, {
       method: 'POST',
       headers,
+      credentials: 'include', // Ensure cookies are sent
       body: JSON.stringify({
         user_id: this.userId,
         message,
@@ -219,24 +221,7 @@ export class ApiClient {
   }
 
   async getChatHistory(): Promise<{ messages: any[] }> {
-    const response = await this.request<{ messages: any[] }>(`/api/history/chat?user_id=${this.userId}`);
-    return response;
-  }
-
-  async saveChatMessage(message: {
-    id: string;
-    content: string;
-    role: string;
-    timestamp: Date;
-    agentUsed?: string;
-    toolsUsed?: string[];
-    processingTime?: number;
-    messageType?: string;
-  }): Promise<{ status: string }> {
-    const response = await this.request<{ status: string }>(`/api/history/chat?user_id=${this.userId}`, {
-      method: 'POST',
-      body: JSON.stringify(message),
-    });
+    const response = await this.request<{ messages: any[] }>('/api/chat/history');
     return response;
   }
 }
