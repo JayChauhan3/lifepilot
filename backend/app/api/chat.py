@@ -11,7 +11,7 @@ router = APIRouter()
 logger = structlog.get_logger()
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest, req: Request, response: Response):
+async def chat(request: ChatRequest, req: Request, http_response: Response):
     # 1. Session Management
     session_id = req.cookies.get("session_id")
     logger.info("🔍 [CHAT] Incoming request", 
@@ -23,7 +23,7 @@ async def chat(request: ChatRequest, req: Request, response: Response):
     if not session_id:
         session_id = str(uuid.uuid4())
         # Set secure HTTP-only cookie
-        response.set_cookie(
+        http_response.set_cookie(
             key="session_id",
             value=session_id,
             max_age=86400, # 24 hours
