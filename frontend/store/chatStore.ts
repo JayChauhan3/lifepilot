@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { devtools, persist } from 'zustand/middleware'
+import { devtools, persist, createJSONStorage } from 'zustand/middleware'
 import { apiClient } from '@/lib/api'
 
 export interface Message {
@@ -258,7 +258,7 @@ export const useChatStore = create<ChatStore>()(
       }),
       {
         name: 'chat-storage',
-        partialize: (state) => ({ messages: state.messages }),
+        storage: createJSONStorage(() => localStorage),
       }
     ),
     {

@@ -219,7 +219,7 @@ export class ApiClient {
   }
 
   async getChatHistory(): Promise<{ messages: any[] }> {
-    const response = await this.request<{ messages: any[] }>('/api/history/chat');
+    const response = await this.request<{ messages: any[] }>(`/api/history/chat?user_id=${this.userId}`);
     return response;
   }
 
@@ -233,7 +233,7 @@ export class ApiClient {
     processingTime?: number;
     messageType?: string;
   }): Promise<{ status: string }> {
-    const response = await this.request<{ status: string }>('/api/history/chat', {
+    const response = await this.request<{ status: string }>(`/api/history/chat?user_id=${this.userId}`, {
       method: 'POST',
       body: JSON.stringify(message),
     });

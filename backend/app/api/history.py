@@ -53,11 +53,11 @@ async def get_task_history(
 
 @router.get("/history/chat")
 async def get_chat_history(
-    current_user: UserModel = Depends(get_current_user),
+    user_id: str,
     limit: int = 100
 ):
     """
-    Get chat history for the current user (last 24 hours only)
+    Get chat history for the user (last 24 hours only)
     """
     try:
         db = get_database()
@@ -73,7 +73,7 @@ async def get_chat_history(
         # Find chat messages for user from last 24 hours, sorted by timestamp (oldest first for chronological order)
         cursor = chat_collection.find(
             {
-                "user_id": current_user.user_id,
+                "user_id": user_id,
                 "timestamp": {"$gte": twenty_four_hours_ago}
             }
         ).sort("timestamp", 1).limit(limit)
@@ -91,7 +91,7 @@ async def get_chat_history(
                 "messageType": doc.get("messageType"),
             })
             
-        logger.info("Chat history retrieved", count=len(messages), user_id=current_user.user_id)
+        logger.info("Chat history retrieved", count=len(messages), user_id=user_id)
         return {"messages": messages}
         
     except Exception as e:
@@ -101,7 +101,7 @@ async def get_chat_history(
 @router.post("/history/chat")
 async def save_chat_message(
     message: ChatMessage,
-    current_user: UserModel = Depends(get_current_user)
+    user_id: str
 ):
     """
     Save a chat message to history
@@ -116,7 +116,7 @@ async def save_chat_message(
         # Save message
         message_doc = {
             "id": message.id,
-            "user_id": current_user.user_id,
+            "user_id": user_id,
             "content": message.content,
             "role": message.role,
             "timestamp": message.timestamp,
@@ -128,7 +128,7 @@ async def save_chat_message(
         
         await chat_collection.insert_one(message_doc)
         
-        logger.info("Chat message saved", user_id=current_user.user_id, message_id=message.id)
+        logger.info("Chat message saved", user_id=user_id, message_id=message.id)
         return {"status": "success"}
         
     except Exception as e:
