@@ -42,8 +42,8 @@ async def chat(request: ChatRequest, req: Request, http_response: Response):
         chat_collection = db["chat_messages"] if db is not None else None
         
         logger.info("💾 [CHAT] Database connection", 
-                    db_available=bool(db),
-                    collection_available=bool(chat_collection))
+                    db_available=db is not None,
+                    collection_available=chat_collection is not None)
 
         # 2. Store User Message
         if chat_collection is not None:
