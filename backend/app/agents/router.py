@@ -62,11 +62,15 @@ class RouterAgent:
         # Memory storage patterns
         memory_patterns = [
             r'remember\s+that\s+i',
+            r'remember\s+i',
+            r'remember\s+that',
             r'remember\s*:\s*',
             r'i\s+have\s+a\s+(meeting|appointment|deadline|task)',
             r'my\s+(preference|habit|routine)',
+            r'i\s+prefer',
             r'store\s+this',
-            r'keep\s+in\s+mind'
+            r'keep\s+in\s+mind',
+            r'note\s+that'
         ]
         
         # Memory retrieval patterns (removed 'remember\s+that\s+i' to avoid conflict with storage)
@@ -251,15 +255,24 @@ class RouterAgent:
                 
                 try:
                     # Extract clean data from the message
-                    # Remove common prefixes like "Remember that", "Remember:", "Store this:", etc.
+                    # Remove common prefixes
                     clean_value = message
                     
-                    # Remove "Remember that I" or "Remember that" prefix
-                    clean_value = re.sub(r'^remember\s+that\s+i\s+', '', clean_value, flags=re.IGNORECASE)
-                    clean_value = re.sub(r'^remember\s+that\s+', '', clean_value, flags=re.IGNORECASE)
-                    clean_value = re.sub(r'^remember:\s*', '', clean_value, flags=re.IGNORECASE)
-                    clean_value = re.sub(r'^store\s+this:\s*', '', clean_value, flags=re.IGNORECASE)
-                    clean_value = re.sub(r'^keep\s+in\s+mind:\s*', '', clean_value, flags=re.IGNORECASE)
+                    # More robust cleaning
+                    prefixes = [
+                        r'^remember\s+that\s+i\s+',
+                        r'^remember\s+i\s+',
+                        r'^remember\s+that\s+',
+                        r'^remember\s+',
+                        r'^remember:\s*',
+                        r'^store\s+this:\s*',
+                        r'^keep\s+in\s+mind:\s*',
+                        r'^note\s+that\s+',
+                        r'^i\s+prefer\s+'
+                    ]
+                    
+                    for prefix in prefixes:
+                        clean_value = re.sub(prefix, '', clean_value, flags=re.IGNORECASE)
                     
                     # Capitalize first letter if needed
                     if clean_value and clean_value[0].islower():
@@ -267,9 +280,9 @@ class RouterAgent:
                     
                     # Check for duplicates by searching existing memories
                     logger.info("Checking for duplicate memories", user_id=user_id, value=clean_value)
-                    existing_memories = await self.memory_bank.get_all_memories(user_id)
                     
-                    # Check if exact same memory already exists (case-insensitive comparison)
+                    # 1. Check exact match first (fastest)
+                    existing_memories = await self.memory_bank.get_all_memories(user_id)
                     clean_value_lower = clean_value.lower().strip()
                     is_duplicate = False
                     
@@ -278,8 +291,25 @@ class RouterAgent:
                         # Only check for EXACT match, not substring
                         if clean_value_lower == existing_lower:
                             is_duplicate = True
-                            logger.info("Duplicate memory detected", user_id=user_id, existing_key=key, new_value=clean_value)
+                            logger.info("Exact duplicate memory detected", user_id=user_id, existing_key=key, new_value=clean_value)
                             break
+                    
+                    # 2. If no exact match, check semantic similarity
+                    if not is_duplicate:
+                        try:
+                            similar_memories = self.memory_bank.retrieve_similar_memories(user_id, clean_value, k=1)
+                            if similar_memories:
+                                top_match = similar_memories[0]
+                                # Threshold for "same meaning" - 0.92 is usually very high similarity
+                                # Adjust this threshold based on testing
+                                if top_match.get("distance", 0) > 0.92:
+                                    is_duplicate = True
+                                    logger.info("Semantic duplicate detected", user_id=user_id, 
+                                              existing_content=top_match.get("content"), 
+                                              new_value=clean_value,
+                                              score=top_match.get("distance"))
+                        except Exception as e:
+                            logger.warning("Semantic duplicate check failed", error=str(e))
                     
                     if is_duplicate:
                         final_response = f"ℹ️ I already remember that you: {clean_value.lower()}. No need to store it again!"
