@@ -27,9 +27,9 @@ async def chat(request: ChatRequest, req: Request, http_response: Response):
             key="session_id",
             value=session_id,
             max_age=86400, # 24 hours
-            secure=False, # Set to True in production with HTTPS
+            secure=True, # Required for SameSite=None
             httponly=True,
-            samesite="lax"
+            samesite="none" # Required for cross-site (Vercel -> Render)
         )
         logger.info("✅ [CHAT] Created new session", 
                     session_id=session_id,
