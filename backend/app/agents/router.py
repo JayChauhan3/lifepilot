@@ -60,6 +60,7 @@ class RouterAgent:
         message_lower = message.lower()
         
         # Memory storage patterns
+        memory_patterns = [
             r'remember\s+that\s+i',
             r'remember\s+i',
             r'remember\s+that',
