@@ -318,9 +318,7 @@ export default function ChatInterface() {
                         </div>
                     </div>
                 </div>
-                <p className="text-center text-xs text-gray-400 mt-2">
-                    Press Enter to send • AI can make mistakes, please verify.
-                </p>
+
             </div>
         </div>
     );
