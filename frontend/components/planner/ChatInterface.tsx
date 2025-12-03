@@ -153,12 +153,21 @@ export default function ChatInterface() {
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-gray-50/30">
                 {messages.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
-                        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
-                            <FiCpu size={32} />
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex gap-3 max-w-[85%]"
+                    >
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 bg-gray-100 border border-gray-200 text-gray-600">
+                            <FiCpu size={14} />
                         </div>
-                        <p>Start a conversation with your LifePilot Planner</p>
-                    </div>
+
+                        <div className="p-4 rounded-2xl text-sm leading-relaxed shadow-sm bg-white text-gray-800 border border-gray-100 rounded-tl-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                "Hello! I'm your **LifePilot Planner**. I create structured plans, routines, and schedules for any area of life where you want improvement. What would you like to plan today?"
+                            </ReactMarkdown>
+                        </div>
+                    </motion.div>
                 )}
 
                 {messages.map((message) => (
