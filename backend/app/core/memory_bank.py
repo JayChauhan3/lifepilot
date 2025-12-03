@@ -42,6 +42,15 @@ class MemoryBank:
         # We don't load everything into RAM at start to avoid memory issues with large datasets
         # Instead we'll query on demand
     
+    def _ensure_db_connection(self):
+        """Ensure MongoDB collection is initialized"""
+        if self.collection is None:
+            from .database import get_database
+            db_instance = get_database()
+            if db_instance is not None:
+                self.collection = db_instance.memories
+                logger.info("MongoDB memories collection lazily initialized")
+    
     def _initialize_vector_db(self):
         """Initialize vector database client"""
         try:
@@ -70,6 +79,8 @@ class MemoryBank:
     async def store_memory(self, user_id: str, key: str, value: Any, category: str = "general") -> bool:
         """Store a memory with category and timestamp"""
         try:
+            self._ensure_db_connection()
+            
             memory_entry = {
                 "value": value,
                 "category": category,
@@ -112,6 +123,8 @@ class MemoryBank:
     
     async def get_memory(self, user_id: str, key: str) -> Optional[Any]:
         """Retrieve a specific memory"""
+        self._ensure_db_connection()
+        
         # Try cache first
         if user_id in self.memories and key in self.memories[user_id]:
             return self.memories[user_id][key]["value"]
@@ -130,6 +143,8 @@ class MemoryBank:
 
     async def get_memories_by_category(self, user_id: str, category: str) -> Dict[str, Any]:
         """Get all memories in a category for a user"""
+        self._ensure_db_connection()
+        
         filtered_memories = {}
         
         # Try MongoDB first (source of truth)
@@ -153,6 +168,8 @@ class MemoryBank:
     
     async def get_all_memories(self, user_id: str) -> Dict[str, Any]:
         """Get all memories for a user"""
+        self._ensure_db_connection()
+        
         all_memories = {}
         
         # Try MongoDB
@@ -175,6 +192,8 @@ class MemoryBank:
     
     async def delete_memory(self, user_id: str, key: str) -> bool:
         """Delete a specific memory"""
+        self._ensure_db_connection()
+        
         success = False
         
         # Delete from MongoDB

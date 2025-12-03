@@ -477,6 +477,28 @@ If the problem persists, please try again in a moment or contact support."""
         
         return self.generate_text(full_prompt, max_tokens=500)
 
+    def generate_memory_response(self, user_message: str, memories: List[str]) -> str:
+        """Generate a conversational response based on memories"""
+        if not memories:
+            return "I don't have any specific memories stored about that yet."
+            
+        system_prompt = """You are a helpful personal assistant.
+        The user is asking about their stored memories or preferences.
+        
+        Your Goal: Answer the user's question naturally using the provided list of memories.
+        
+        Rules:
+        1. If the user asks "What do you remember?", summarize the memories in a clean, bulleted list.
+        2. If the user asks a specific question (e.g., "Do I like tea?"), answer directly using the memory (e.g., "Yes, you prefer tea over coffee").
+        3. Be friendly and conversational.
+        4. Do not make up information not in the memories.
+        """
+        
+        memory_text = "\n".join([f"- {m}" for m in memories])
+        full_prompt = f"{system_prompt}\n\nUser Question: {user_message}\n\nStored Memories:\n{memory_text}"
+        
+        return self.generate_text(full_prompt, max_tokens=1000)
+
 # Global LLM service instance
 _llm_service = None
 

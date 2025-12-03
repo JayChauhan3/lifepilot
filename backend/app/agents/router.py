@@ -358,9 +358,8 @@ class RouterAgent:
                         user_memories.append(memory_text)
                     
                     if user_memories:
-                        # Simple, clean format like ChatGPT
-                        formatted_list = "\n".join([f"- {mem}" for mem in user_memories])
-                        final_response = f"**Here's what I remember about you:**\n\n{formatted_list}"
+                        # Use LLM to generate a natural response
+                        final_response = self.llm_service.generate_memory_response(message, user_memories)
                         
                         logger.info("Memory retrieval completed", user_id=user_id, memories_count=len(user_memories))
                     else:
