@@ -6,35 +6,34 @@ import { FiSend, FiUser, FiCpu, FiMic, FiSquare } from "react-icons/fi";
 import clsx from "clsx";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { plannerService } from "@/services/plannerService";
-
-type Message = {
-    id: string;
-    role: "user" | "assistant";
-    content: string;
-    timestamp: Date;
-};
+import { useChatStore } from "@/store/chatStore";
 
 export default function ChatInterface() {
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: "1",
-            role: "assistant",
-            content: "Hello! I'm your **LifePilot Planner**. I create structured plans, routines, and schedules for any area of life where you want improvement. What would you like to plan today?",
-            timestamp: new Date(),
-        },
-    ]);
-    const [inputValue, setInputValue] = useState("");
-    const [isTyping, setIsTyping] = useState(false);
+    const {
+        messages,
+        inputValue,
+        isTyping,
+        isLoading,
+        setInputValue,
+        sendMessage,
+        loadChatHistory,
+        stopStreaming
+    } = useChatStore();
+
     const [isListening, setIsListening] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const recognitionRef = useRef<any>(null);
-    const abortControllerRef = useRef<AbortController | null>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
+
+    // Load chat history on mount
+    useEffect(() => {
+        console.log('🎬 [CHAT_INTERFACE] Mounting and loading history...');
+        loadChatHistory();
+    }, []);
 
     useEffect(() => {
         scrollToBottom();
@@ -63,7 +62,7 @@ export default function ChatInterface() {
                 }
 
                 if (finalTranscript) {
-                    setInputValue((prev) => prev + finalTranscript);
+                    setInputValue(inputValue + finalTranscript);
                 }
             };
 
@@ -82,7 +81,7 @@ export default function ChatInterface() {
                 recognitionRef.current.stop();
             }
         };
-    }, []);
+    }, [inputValue, setInputValue]);
 
     const toggleListening = () => {
         if (!recognitionRef.current) {
@@ -102,71 +101,16 @@ export default function ChatInterface() {
     const handleSendMessage = async () => {
         if (!inputValue.trim() || isTyping) return;
 
-        const newMessage: Message = {
-            id: Date.now().toString(),
-            role: "user",
-            content: inputValue,
-            timestamp: new Date(),
-        };
-
-        setMessages((prev) => [...prev, newMessage]);
-        setInputValue("");
-        setIsTyping(true);
-
         // Reset textarea height
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
         }
 
-        // Create new AbortController for this request
-        abortControllerRef.current = new AbortController();
-
-        try {
-            // Call backend API with abort signal
-            const response = await plannerService.chat(inputValue, {
-                signal: abortControllerRef.current.signal
-            });
-
-            setIsTyping(false);
-            setMessages((prev) => [
-                ...prev,
-                {
-                    id: (Date.now() + 1).toString(),
-                    role: "assistant",
-                    content: response.response || "I apologize, but I couldn't process that request.",
-                    timestamp: new Date(),
-                },
-            ]);
-        } catch (error: any) {
-            // Don't show error if request was aborted by user
-            if (error.name === 'AbortError') {
-                console.log('Request aborted by user');
-                setIsTyping(false);
-                return;
-            }
-
-            console.error('Chat error:', error);
-            setIsTyping(false);
-            setMessages((prev) => [
-                ...prev,
-                {
-                    id: (Date.now() + 1).toString(),
-                    role: "assistant",
-                    content: "I apologize, but I encountered an error. Please try again.",
-                    timestamp: new Date(),
-                },
-            ]);
-        } finally {
-            abortControllerRef.current = null;
-        }
+        await sendMessage();
     };
 
     const handleStopGeneration = () => {
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            abortControllerRef.current = null;
-        }
-        setIsTyping(false);
+        stopStreaming();
     };
 
     const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -208,6 +152,15 @@ export default function ChatInterface() {
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-gray-50/30">
+                {messages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
+                        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                            <FiCpu size={32} />
+                        </div>
+                        <p>Start a conversation with your LifePilot Planner</p>
+                    </div>
+                )}
+
                 {messages.map((message) => (
                     <motion.div
                         key={message.id}
@@ -280,7 +233,7 @@ export default function ChatInterface() {
                     </motion.div>
                 ))}
 
-                {isTyping && (
+                {(isTyping || isLoading) && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -315,7 +268,7 @@ export default function ChatInterface() {
                             className="w-full px-2 bg-transparent border-0 focus:outline-none resize-none text-base text-gray-900 placeholder-gray-500"
                             rows={1}
                             style={{ maxHeight: '200px' }}
-                            disabled={isTyping}
+                            disabled={isTyping || isLoading}
                         />
                         <div className="flex justify-end items-center px-1 gap-2">
                             <button
@@ -331,7 +284,7 @@ export default function ChatInterface() {
                                 <FiMic size={16} />
                                 {isListening && <span className="text-xs">Listening...</span>}
                             </button>
-                            {isTyping ? (
+                            {(isTyping || isLoading) ? (
                                 <button
                                     onClick={handleStopGeneration}
                                     className="p-2 rounded-xl transition-all duration-200 flex items-center justify-center shadow-sm bg-red-500 text-white hover:bg-red-600 hover:scale-105"
