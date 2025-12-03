@@ -329,7 +329,7 @@ class RouterAgent:
                     
                     if user_memories:
                         # Simple, clean format like ChatGPT
-                        formatted_list = "\n".join([f"• {mem}" for mem in user_memories])
+                        formatted_list = "\n".join([f"- {mem}" for mem in user_memories])
                         final_response = f"**Here's what I remember about you:**\n\n{formatted_list}"
                         
                         logger.info("Memory retrieval completed", user_id=user_id, memories_count=len(user_memories))
