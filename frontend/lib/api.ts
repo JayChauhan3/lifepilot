@@ -86,7 +86,13 @@ export class ApiClient {
         credentials: 'include', // Ensure cookies are sent
       });
 
-      console.log('Response status:', response.status, response.statusText);
+      console.log('🌐 [API] Response received:', {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        hasCookies: document.cookie.includes('session_id'),
+        cookies: document.cookie
+      });
 
       if (!response.ok) {
         const errorText = await response.text();

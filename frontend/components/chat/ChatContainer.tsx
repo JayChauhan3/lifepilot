@@ -9,7 +9,10 @@ export const ChatContainer: React.FC = () => {
 
   // Load chat history from database on mount
   useEffect(() => {
+    console.log('🎬 [CHATCONTAINER] Component mounted - calling loadChatHistory')
     loadChatHistory()
+      .then(() => console.log('✅ [CHATCONTAINER] loadChatHistory completed'))
+      .catch(err => console.error('❌ [CHATCONTAINER] loadChatHistory failed:', err))
   }, [])
 
   return (
