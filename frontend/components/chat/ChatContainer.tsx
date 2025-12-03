@@ -1,11 +1,16 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { MessageList } from '@/components/chat/MessageList'
 import { ChatInput } from '@/components/chat/ChatInput'
 import { SystemPromptEditor } from '@/components/chat/SystemPromptEditor'
 import { useChatStore } from '@/store/chatStore'
 
 export const ChatContainer: React.FC = () => {
-  const { isSystemPromptExpanded, clearMessages, toggleSystemPrompt } = useChatStore()
+  const { isSystemPromptExpanded, clearMessages, toggleSystemPrompt, loadChatHistory } = useChatStore()
+
+  // Load chat history from database on mount
+  useEffect(() => {
+    loadChatHistory()
+  }, [])
 
   return (
     <div className="relative h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">

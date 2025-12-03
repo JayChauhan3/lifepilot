@@ -85,7 +85,15 @@ class RouterAgent:
             r'list\s+(my\s+)?memor(y|ies)',
             r'what\s+did\s+i\s+store',
             r'any\s+memor(y|ies)',
-            r'what\s+do\s+(you|u)\s+know'
+            r'what\s+do\s+(you|u)\s+know',
+            r'retrieve',
+            r'tell\s+me\s+everything',
+            r'tell\s+me\s+all',
+            r'what\s+do\s+you\s+know\s+about\s+my',
+            r'everything\s+you\s+know',
+            r'all\s+you\s+know',
+            r'get\s+my\s+memor(y|ies)',
+            r'fetch\s+my\s+memor(y|ies)'
         ]
         
         # Knowledge query patterns

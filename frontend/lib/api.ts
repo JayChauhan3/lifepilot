@@ -217,6 +217,28 @@ export class ApiClient {
       reader.releaseLock();
     }
   }
+
+  async getChatHistory(): Promise<{ messages: any[] }> {
+    const response = await this.request<{ messages: any[] }>('/api/history/chat');
+    return response;
+  }
+
+  async saveChatMessage(message: {
+    id: string;
+    content: string;
+    role: string;
+    timestamp: Date;
+    agentUsed?: string;
+    toolsUsed?: string[];
+    processingTime?: number;
+    messageType?: string;
+  }): Promise<{ status: string }> {
+    const response = await this.request<{ status: string }>('/api/history/chat', {
+      method: 'POST',
+      body: JSON.stringify(message),
+    });
+    return response;
+  }
 }
 
 // Create singleton instance
