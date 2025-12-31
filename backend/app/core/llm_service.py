@@ -15,6 +15,10 @@ class LLMProvider:
         """Generate text from prompt"""
         raise NotImplementedError
 
+    def generate_tool_response(self, prompt: str, tools: List[Any], max_tokens: int = 4000) -> Any:
+        """Generate text from prompt with tools"""
+        raise NotImplementedError
+
 class GeminiLLM(LLMProvider):
     """Google Gemini LLM using API key authentication"""
     
@@ -70,6 +74,30 @@ class GeminiLLM(LLMProvider):
             return result
         except Exception as e:
             logger.error("Error generating content with Gemini", error=str(e))
+    def generate_tool_response(self, prompt: str, tools: List[Any], max_tokens: int = 4000) -> Any:
+        """Generate response utilizing tools"""
+        logger.info("GeminiLLM generate_tool_response called", tool_count=len(tools))
+        if not self._model:
+            raise ValueError("Gemini API key not configured. Cannot generate response.")
+        
+        try:
+            # Create a separate chat session for tool use to handle multi-turn if needed
+            # But for routing, single turn generate_content is usually fine
+            
+            response = self._model.generate_content(
+                prompt,
+                tools=tools,
+                generation_config=genai.GenerationConfig(
+                    max_output_tokens=max_tokens,
+                    temperature=0.0  # Zero temperature for deterministic routing
+                )
+            )
+            
+            logger.info("Gemini tool response received")
+            return response
+            
+        except Exception as e:
+            logger.error("Error generating tool content with Gemini", error=str(e))
             raise e
     
     def _mock_response(self, prompt: str) -> str:
@@ -171,6 +199,15 @@ class LLMService:
     def generate_text(self, prompt: str, max_tokens: int = 1000, temperature: float = 0.7) -> str:
         """Generate text using the configured provider"""
         return self._provider.generate_text(prompt, max_tokens, temperature)
+    
+    def generate_tool_response(self, prompt: str, tools: List[Any], max_tokens: int = 4000) -> Any:
+        """Generate response utilizing tools (Gemini only)"""
+        if isinstance(self._provider, GeminiLLM):
+            return self._provider.generate_tool_response(prompt, tools, max_tokens)
+        else:
+            logger.warning("Tool use not supported for this provider", provider=self.provider_name)
+            # Fallback or invalid
+            return None
     
     def generate_plan(self, user_message: str, context: str = "") -> Dict[str, Any]:
         """Generate a structured plan"""
