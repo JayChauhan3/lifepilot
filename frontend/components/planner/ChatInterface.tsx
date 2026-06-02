@@ -133,7 +133,7 @@ export default function ChatInterface() {
     }, [inputValue]);
 
     return (
-        <div className="flex flex-col h-[calc(100vh-8rem)] bg-white rounded-2xl shadow-soft border border-gray-100 overflow-hidden">
+        <div className="flex flex-col h-full min-h-0 bg-white rounded-2xl shadow-soft border border-gray-100 overflow-hidden">
             {/* Chat Header */}
             <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white z-10">
                 <div className="flex items-center gap-3">
@@ -151,7 +151,7 @@ export default function ChatInterface() {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-gray-50/30">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-6 bg-gray-50/30">
                 {messages.length === 0 && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}

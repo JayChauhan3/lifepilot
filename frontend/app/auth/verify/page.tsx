@@ -73,7 +73,7 @@ function VerifyContent() {
                         </p>
                         {status === 'error' && (
                             <div className="mt-6">
-                                <Link href="/auth/login" className="text-indigo-600 hover:text-indigo-500 font-medium">
+                                <Link href="/login" className="text-indigo-600 hover:text-indigo-500 font-medium">
                                     Back to Login
                                 </Link>
                             </div>

@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/services/authService';
+import { loginSchema } from '@/lib/validation/authSchemas';
 
 function LoginForm() {
     const router = useRouter();
@@ -17,9 +18,23 @@ function LoginForm() {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (searchParams.get('verified') === 'true') {
-            setSuccess('Successfully verified and account created.');
-        }
+        // If user is already logged in, send them away.
+        const maybeRedirectIfAuthed = async () => {
+            if (!authService.isAuthenticated()) return;
+            try {
+                await authService.getCurrentUser();
+                const next = searchParams.get('next');
+                router.replace(next || '/');
+            } catch {
+                authService.removeToken();
+            }
+        };
+
+        maybeRedirectIfAuthed();
+
+        if (searchParams.get('verified') === 'true') setSuccess('Email verified successfully. Please sign in.');
+        if (searchParams.get('oauthError') === '1') setError('Google sign-in failed. Please try again.');
+        if (searchParams.get('sessionExpired') === '1') setError('Session expired. Please sign in again.');
     }, [searchParams]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -30,11 +45,18 @@ function LoginForm() {
         e.preventDefault();
         setError('');
         setSuccess(''); // Clear success message on new login attempt
-        setLoading(true);
 
         try {
-            await authService.login(formData);
-            router.push('/');
+            const parsed = loginSchema.safeParse(formData);
+            if (!parsed.success) {
+                setError(parsed.error.issues[0]?.message || 'Please check your inputs.');
+                return;
+            }
+
+            setLoading(true);
+            await authService.login(parsed.data);
+            const next = searchParams.get('next');
+            router.replace(next || '/');
         } catch (err: any) {
             setError(err.message || 'Login failed');
         } finally {
@@ -85,6 +107,7 @@ function LoginForm() {
                                 onChange={handleChange}
                                 required
                                 autoComplete="email"
+                                disabled={loading}
                                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
                                 placeholder="you@example.com"
                             />
@@ -102,6 +125,7 @@ function LoginForm() {
                                 onChange={handleChange}
                                 required
                                 autoComplete="current-password"
+                                disabled={loading}
                                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
                                 placeholder="••••••••"
                             />

@@ -61,12 +61,15 @@ app = FastAPI(
 # Add rate limiter
 app.state.limiter = limiter
 
-# Configure CORS with specific origins
-allowed_origins = settings.CORS_ORIGINS.split(",")
+# Configure CORS with specific origins.
+# Support a safe "wildcard mode" by setting CORS_ORIGINS="*".
+origins_raw = (settings.CORS_ORIGINS or "").strip()
+allowed_origins = ["*"] if origins_raw == "*" else [o.strip() for o in origins_raw.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
+    # Note: credentials cannot be used with wildcard origins. In wildcard mode we disable credentials.
+    allow_credentials=False if allowed_origins == ["*"] else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

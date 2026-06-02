@@ -19,7 +19,7 @@ function AuthCallbackContent() {
                 if (!token) {
                     setStatus('error');
                     setMessage('No authentication token received');
-                    setTimeout(() => router.push('/login'), 3000);
+                    setTimeout(() => router.push('/login?oauthError=1'), 1500);
                     return;
                 }
 
@@ -30,11 +30,11 @@ function AuthCallbackContent() {
                 await authService.getCurrentUser();
 
                 // Redirect immediately to home
-                router.push('/');
+                router.replace('/');
             } catch (error: any) {
                 setStatus('error');
                 setMessage(error.message || 'Authentication failed');
-                setTimeout(() => router.push('/login'), 3000);
+                setTimeout(() => router.push('/login?oauthError=1'), 1500);
             }
         };
 

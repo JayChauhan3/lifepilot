@@ -18,7 +18,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
             try {
                 // First check if token exists
                 if (!authService.isAuthenticated()) {
-                    router.push('/login');
+                    const next = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
+                    router.push(`/login?next=${encodeURIComponent(next)}`);
                     return;
                 }
 
@@ -28,7 +29,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
             } catch (error) {
                 // Token is invalid or expired, redirect to login
                 authService.removeToken();
-                router.push('/login');
+                const next = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
+                router.push(`/login?sessionExpired=1&next=${encodeURIComponent(next)}`);
             } finally {
                 setIsVerifying(false);
             }

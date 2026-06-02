@@ -1,6 +1,7 @@
 import structlog
 import re
 import time
+import math
 from ..core.a2a import A2AProtocol
 from ..core.session_service import SessionService
 from ..core.memory_bank import MemoryBank, get_memory_bank
@@ -17,6 +18,13 @@ from .analyzer import AnalyzerAgent
 from .ui_agent import UIAgent
 
 logger = structlog.get_logger()
+
+# Optional import (only available when Gemini SDK is installed)
+try:
+    from google.api_core.exceptions import ResourceExhausted  # type: ignore
+except Exception:  # pragma: no cover
+    ResourceExhausted = None  # type: ignore
+
 
 class RouterAgent:
     """
@@ -296,12 +304,56 @@ class RouterAgent:
             }
             
         except Exception as e:
+            processing_time = time.time() - start_time
+
+            # Friendlier message for Gemini quota/rate-limit.
+            # Gemini raises google.api_core.exceptions.ResourceExhausted for 429s.
+            is_quota_error = False
+            if ResourceExhausted is not None and isinstance(e, ResourceExhausted):
+                is_quota_error = True
+            else:
+                msg = str(e).lower()
+                if "resourceexhausted" in msg or "quota exceeded" in msg or "exceeded your current quota" in msg:
+                    is_quota_error = True
+
+            if is_quota_error:
+                err_text = str(e)
+                retry_after_seconds: int | None = None
+
+                # Example: "Please retry in 52.80170325s."
+                m = re.search(r"retry in\s+([0-9]+(?:\.[0-9]+)?)s", err_text, flags=re.IGNORECASE)
+                if m:
+                    try:
+                        retry_after_seconds = max(1, int(math.ceil(float(m.group(1)))))
+                    except Exception:
+                        retry_after_seconds = None
+
+                # Stable user-facing copy (no countdown / fluctuating seconds).
+                friendly = "AI quota reached. Please try again in a little while."
+
+                logger.warning(
+                    "Gemini quota/rate-limit hit",
+                    retry_after_seconds=retry_after_seconds,
+                    error=str(e),
+                )
+
+                return {
+                    "response": friendly,
+                    "agent_used": "rate_limited",
+                    "tools_used": [],
+                    "processing_time": processing_time,
+                    "message_type": "rate_limited",
+                    "data": {"retry_after_seconds": retry_after_seconds},
+                }
+
             logger.error("Error processing message", error=str(e))
             import traceback
             logger.error(traceback.format_exc())
             return {
                 "response": "I encountered an error. Please try again.",
                 "agent_used": "error",
+                "tools_used": [],
+                "processing_time": processing_time,
                 "message_type": "error"
             }
 

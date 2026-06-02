@@ -22,14 +22,17 @@ async def chat(request: ChatRequest, req: Request, http_response: Response):
     
     if not session_id:
         session_id = str(uuid.uuid4())
-        # Set secure HTTP-only cookie
+        # Cookie settings:
+        # - In local dev (http), Secure cookies won't be stored by the browser.
+        # - For cross-site (prod), SameSite=None + Secure is required.
+        is_https = req.url.scheme == "https"
         http_response.set_cookie(
             key="session_id",
             value=session_id,
             max_age=86400, # 24 hours
-            secure=True, # Required for SameSite=None
+            secure=is_https,
             httponly=True,
-            samesite="none" # Required for cross-site (Vercel -> Render)
+            samesite="none" if is_https else "lax",
         )
         logger.info("✅ [CHAT] Created new session", 
                     session_id=session_id,
